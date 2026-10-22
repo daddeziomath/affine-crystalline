@@ -1,6 +1,7 @@
 # Affine crystalline cohomology and de Rham cohomology in Lean 4
 
 [![CI](https://github.com/daddeziomath/affine-crystalline/actions/workflows/ci.yml/badge.svg)](https://github.com/daddeziomath/affine-crystalline/actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23573534.svg)](https://doi.org/10.5281/zenodo.23573534)
 
 A Lean 4 formalisation, built on Mathlib, of the **comparison between crystalline
 cohomology and divided power de Rham cohomology** for an affine scheme `Spec C`
