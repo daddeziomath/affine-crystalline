@@ -149,10 +149,7 @@ Antoine Chambert-Loir and María Inés de Frutos-Fernández. Two files in
 `AffineCrystalline/DeRham/Presentation/` are due to Joël Riou and keep his
 copyright notice.
 
-This work was supported by the IdEx University of Strasbourg. It was also
-supported by the Agence Nationale de la Recherche (ANR, French National Research
-Agency) through the project ANR-25-CE40-7869-01. We thank Anthropic for access to
-Claude through the Claude Team plan for scientists.
+This work was by the Agence Nationale de la Recherche (ANR-25-CE40-7869-01) and the IdEx University of Strasbourg (BORÉAL). We thank Anthropic for access to Claude through the Claude Team plan for scientists.
 
 ## Citing
 
