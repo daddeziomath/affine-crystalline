@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this formalisation, please cite it as below."
+title: "Affine crystalline cohomology and de Rham cohomology in Lean 4"
+abstract: >-
+  A sorry-free Lean 4 formalisation of the affine comparison between
+  crystalline cohomology and PD de Rham cohomology (p nilpotent), built on an
+  infinitesimal site whose thickenings have a bounded nilpotence exponent.
+type: software
+authors:
+  - family-names: "D'Addezio"
+    given-names: "Marco"
+    affiliation: "Université de Strasbourg"
+license: Apache-2.0
+repository-code: "https://github.com/daddeziomath/affine-crystalline"
+version: "1.0.0"
+date-released: "2026-10-22"
+keywords:
+  - Lean 4
+  - Mathlib
+  - crystalline cohomology
+  - de Rham cohomology
+  - divided powers
+  - formalisation

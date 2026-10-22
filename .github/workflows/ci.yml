@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Installs the toolchain from lean-toolchain, fetches the Mathlib
+      # cache and runs `lake build`.
+      - uses: leanprover/lean-action@v1
+
+      - name: No sorry in the library
+        run: |
+          if grep -rnw --include='*.lean' 'sorry' AffineCrystalline; then
+            echo "::error::found sorry"; exit 1
+          fi
+
+      - name: Main theorems use only the standard axioms
+        run: |
+          out="$(lake env lean scripts/CheckAxioms.lean)"
+          echo "$out"
+          expected="depends on axioms: [propext, Classical.choice, Quot.sound]"
+          flat="$(printf '%s' "$out" | tr '\n' ' ' | tr -s ' ')"
+          n="$(grep -o 'depends on axioms' <<< "$flat" | wc -l)"
+          ok="$(grep -oF "$expected" <<< "$flat" | wc -l)"
+          [ "$n" -ge 3 ] && [ "$ok" -eq "$n" ] || { echo "::error::unexpected axioms"; exit 1; }
