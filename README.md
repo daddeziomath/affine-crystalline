@@ -30,6 +30,10 @@ the cohomology of `Ocris` on `INF(C/A)` is already computed there. The main
 theorems use the **Frobenius levels** `INF_e`, the thickenings whose kernel is
 killed by `x ↦ x ^ (p ^ e)`, under the hypothesis `(p ^ e)! = 0` in `A`.
 
+The accompanying article, *Formalising crystalline de Rham comparison on a
+bounded infinitesimal site* by Marco D'Addezio, is in [`paper/`](paper/)
+([PDF](paper/affine-de-rham-article.pdf)).
+
 ## Main results
 
 Let `(A, I, γ)` be a divided power ring with `p` prime, `p ∈ I` and `p`
@@ -131,6 +135,7 @@ lake env lean scripts/CheckAxioms.lean    # print the axioms of the main theorem
 | `AffineCrystalline/Envelope/` | Existence of envelopes (`Construction.lean`), consequences of their universal property, special cases, divided power algebras |
 | `AffineCrystalline/MainTheorems.lean` | The main theorems for the envelope family given by the existence theorem |
 | `AffineCrystalline/AffineCrystalline.lean` | Imports the whole library |
+| `paper/` | The accompanying article (LaTeX source and PDF) |
 | `scripts/CheckAxioms.lean` | Prints the axioms of the main theorems |
 
 ## Scope

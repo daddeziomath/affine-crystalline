@@ -1,0 +1,1210 @@
+\documentclass[11pt]{amsart}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{}
+% Unicode characters occurring inside Lean identifiers
+\DeclareUnicodeCharacter{03C0}{\ensuremath{\pi}}
+\DeclareUnicodeCharacter{03B9}{\ensuremath{\iota}}
+\DeclareUnicodeCharacter{2964}{\ensuremath{\Rightarrow}}
+\DeclareUnicodeCharacter{22A5}{\ensuremath{\bot}}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage[margin=1.15in]{geometry}
+\usepackage{booktabs,tabularx,longtable}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[obeyspaces]{url}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+
+% Lean identifiers and file names (typewriter, breakable, underscores allowed)
+\DeclareUrlCommand\lean{\urlstyle{tt}}
+\makeatletter
+\g@addto@macro\UrlBreaks{\do\-\do\_\do\.\do\A\do\B\do\C\do\D\do\E\do\F\do\G\do\H\do\I\do\J\do\K\do\L\do\M\do\N\do\O\do\P\do\Q\do\R\do\S\do\T\do\U\do\V\do\W\do\X\do\Y\do\Z}
+\makeatother
+\Urlmuskip=0mu plus 1mu
+\setlength{\emergencystretch}{3em}
+
+% Space between prose paragraphs; no paragraph indentation
+\newcommand{\spa}{\medskip}
+\setlength{\parindent}{0pt}
+
+% Notation
+\newcommand{\Ocris}{\mathcal{O}_{\mathrm{cris}}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\F}{\mathbb{F}}
+\DeclareMathOperator{\Spec}{Spec}
+\DeclareMathOperator{\Hom}{Hom}
+\DeclareMathOperator{\Map}{Map}
+\DeclareMathOperator{\Tot}{Tot}
+\DeclareMathOperator{\Coind}{Coind}
+\newcommand{\INF}{\mathrm{INF}}
+\newcommand{\Mod}{\mathrm{Mod}}
+\newcommand{\dpow}[1]{^{[#1]}}
+\newcommand{\pow}{\mathrm{pow}}
+% Public repository (to be filled in before release)
+\newcommand{\repourl}{https://github.com/daddeziomath/affine-crystalline}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem*{theoremA}{Theorem A}
+\newtheorem*{theoremB}{Theorem B}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{setting}[theorem]{Setting}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% "Lean:" pointer after a statement
+\newcommand{\leanref}[1]{\par\smallskip\noindent{\small\textit{Lean:} #1}\par\smallskip}
+
+\lstdefinelanguage{lean4}{
+  morekeywords={theorem,lemma,def,structure,where,fun,by,Type,Nonempty},
+  sensitive=true,
+  morecomment=[l]{--},
+  morestring=[b]",
+}
+\lstset{
+  language=lean4,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue!60!black},
+  commentstyle=\itshape\color{gray},
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  mathescape=true,
+  frame=single,
+  framesep=4pt,
+  xleftmargin=6pt,
+  xrightmargin=6pt,
+}
+
+\title{Formalising crystalline de Rham comparison\\ on a bounded infinitesimal site}
+\author{Marco D'Addezio}
+\address{Université de Strasbourg}
+\email{daddezio@unistra.fr}
+\date{October 22, 2026}
+
+\begin{document}
+
+\begin{abstract}
+We present a complete Lean~4 formalisation of the affine crystalline de Rham comparison theorem. For this scope, we replace the standard crystalline site with a variant of the infinitesimal site endowed with a crystalline structural sheaf. On the way, we formalise the existence of divided power envelopes, building on the formalisation of divided powers by Chambert-Loir and de Frutos-Fernández. The Lean code was produced with the AI system Claude.
+\end{abstract}
+
+\maketitle
+
+\noindent\textbf{Code availability.} The formalisation and this article are available at \expandafter\url\expandafter{\repourl}. The formalisation is archived on Zenodo with DOI \href{https://doi.org/10.5281/zenodo.23573534}{10.5281/zenodo.23573534}.
+
+\setcounter{tocdepth}{1}
+\tableofcontents
+
+%======================================================================
+\section{Introduction}\label{sec:intro}
+%======================================================================
+
+Let $p$ be a prime, let $(A, I, \gamma)$ be a divided power ring with $p \in I$ and $p$ nilpotent in $A$, and let $C$ be an $A$-algebra with $I \cdot C = 0$; write $X \coloneqq \Spec(C)$ and $S \coloneqq \Spec(A)$. If $P \twoheadrightarrow C$ is a surjection from a polynomial $A$-algebra and $D$ is the divided power envelope of its kernel, compatible with $\gamma$, then
+\[
+R\Gamma\big(\mathrm{Cris}(X/S), \mathcal{O}_{X/S}\big) \;\simeq\; \Omega^\bullet_{D},
+\]
+where $\Omega^\bullet_D$ is the de Rham complex of $D$ with divided power differentials \cite{berthelot,berthelot-ogus,bhatt-dejong}, \cite[Tag~07LG]{stacks}. This article reports a complete formalisation in Lean~4 with Mathlib \cite{mathlib} of an affine version of this comparison, with trivial coefficients, in which the cohomology is computed on an infinitesimal site instead of the crystalline site.
+
+\spa
+
+The main difference with the classical approach is the site. Instead of the crystalline site, whose objects carry divided powers, we use an \emph{infinitesimal} site whose objects are surjections $B \twoheadrightarrow C$ whose kernel has a uniform nilpotence exponent. Divided powers then enter only through the structure sheaf $\Ocris$, which sends a thickening to its divided power envelope and is used only through the universal property of envelopes. The precise hypotheses are collected in Setting~\ref{Setting:s}, and the Frobenius levels $\INF_e$, whose objects are the thickenings with kernel killed by $x \mapsto x^{p^e}$, the Čech objects $X_e(n)$ and the algebras $D(n) \coloneqq \Ocris(X_e(n))$ are introduced in Sections~\ref{sec:site} and~\ref{sec:ocris}.
+
+\spa
+
+The cohomology $R\Gamma(\INF(C/A), \Ocris)$ in Theorems~A and~B is the cohomology of this infinitesimal site. We prove in Lean that it is already computed on $\INF_e$ for every $e$ with $(p^e)! = 0$ in $A$, for instance for $e = N$ if $p^N = 0$ in $A$ (Theorem~\ref{thm:adjunction-derived}): the truncation functor $\INF(C/A) \to \INF_e$ is left adjoint to the inclusion, and it does not change divided power envelopes. That $R\Gamma(\INF(C/A), \Ocris)$ agrees with the crystalline cohomology $R\Gamma(\mathrm{Cris}(X/S), \mathcal{O}_{X/S})$ above is classical: it follows from the comparison of both with $\Omega^\bullet_D$, or from the description of affine crystalline cohomology through affine divided power thickenings \cite[Tag~07JK]{stacks}. This agreement is not formalised (Section~\ref{sec:scope}), and the library does not define the crystalline site. Berthelot's crystalline site therefore appears in this article only as background and motivation.
+
+\spa
+
+The two main results are the following.
+
+\begin{theoremA}
+Assume Setting~\ref{Setting:s}, so that $e$ is a positive integer with $(p^e)! = 0$ in $A$, and let $E$ be a family of compatible divided power envelopes. For every $n \ge 0$ there is an isomorphism of $A$-modules
+\[
+H^n\big(R\Gamma(\INF(C/A), \Ocris)\big) \;\simeq\; H^n\big(D(0) \to D(1) \to D(2) \to \cdots\big).
+\]
+\end{theoremA}
+
+\begin{theoremB}
+In the situation of Theorem~A, for every $k \ge 0$ there is an isomorphism of $A$-modules
+\[
+H^k\big(R\Gamma(\INF(C/A), \Ocris)\big) \;\simeq\; H^k\big(\Omega^\bullet_{D(0)}\big),
+\]
+where $D(0) = \Ocris(X_e(0))$ satisfies the universal property of a compatible divided power envelope of $A[x_c : c \in C]$ with respect to the kernel of $x_c \mapsto c$ (Proposition~\ref{prop:cech-envelope}).
+\end{theoremB}
+
+Theorem~A is Theorem~\ref{thm:cech-alexander} and Theorem~B is Theorem~\ref{thm:main}. Both are proved in Lean without \texttt{sorry}, and both use only the axioms \lean{propext}, \lean{Classical.choice} and \lean{Quot.sound}. Both are stated for an arbitrary family $E$, and such a family exists: divided power envelopes exist (Theorem~\ref{thm:envelope-existence}), and this is formalised as well. The theorems are therefore unconditional.
+
+\spa
+
+Section~\ref{sec:motivation} explains the choice of site. Section~\ref{sec:site} develops the site and Section~\ref{sec:ocris} the sheaf $\Ocris$. Section~\ref{sec:pd-derham} constructs divided power differentials and de Rham complexes, Section~\ref{sec:homological} collects the homological algebra, Section~\ref{sec:level} proves Theorem~A, and Section~\ref{sec:derham} proves Theorem~B. Section~\ref{sec:produced} explains how the formalisation was produced, Section~\ref{sec:scope} what remains, and Appendix~\ref{app:index} indexes the main declarations.
+
+\spa
+
+Every statement in this article followed by a \emph{Lean} pointer is proved in the library without \texttt{sorry}. Names are given up to their namespace. Most are in \lean{AffineCrystalline} or one of its sub-namespaces, such as \lean{AffineCrystalline.InfinitesimalSite}; the general material on envelopes, divided power differentials and de Rham complexes, such as \lean{IsDPEnvelope}, \lean{DPEnvelopeChoice}, \lean{PDKaehler} and \lean{DeRhamComplex}, is in the root namespace or in namespaces of Mathlib. Paths are relative to the folder \lean{AffineCrystalline/} of the repository.
+
+%======================================================================
+\section{Motivation: an infinitesimal site without divided powers}\label{sec:motivation}
+%======================================================================
+
+Berthelot's crystalline site appears in this article only as background and motivation: the cohomology we formalise is defined on the infinitesimal site of Section~\ref{sec:site}, and its relation with Berthelot's site is recalled in Section~\ref{subsec:comparison}.
+
+\subsection{Why the objects carry no divided powers}
+
+In Lean a divided power structure is data indexed by an ideal: its type is \lean{DividedPowers K} for a specific ideal $K$. Rewriting $K$ along an equality of ideals needs transport lemmas, and every map built along the way needs a separate compatibility proof. A Čech computation needs coproducts and Čech objects, and each of them would have to be equipped with divided powers and checked by hand.
+
+\spa
+
+Our idea is to avoid divided power structures on the objects of the site altogether. Instead, we impose a condition on the infinitesimal thickenings themselves, a uniform bound on the nilpotence exponent of the kernel; it is a property, not extra data, and only involves ordinary commutative algebra.
+
+\begin{definition}\label{def:thickening}
+An object of the \emph{bounded infinitesimal site} is a surjective $A$-algebra map $\pi \colon B \twoheadrightarrow C$, with no divided powers, whose kernel has a uniform nilpotence exponent: there is an integer $n \ge 0$ such that $x^{n} = 0$ for every $x \in \ker(\pi)$.
+A morphism $(B, \pi) \to (B', \pi')$ is an $A$-algebra map $f \colon B \to B'$ with $\pi' \circ f = \pi$, with no further condition.
+\end{definition}
+
+The exponent condition is the field \lean{kernel_bounded} of the structure \lean{InfinitesimalThickening}. The use of this site is taken from \cite{edged}.
+
+\subsection{What the exponent condition provides}
+
+It gives truncations, levels, binary coproducts and a weakly initial object in each level, all in \lean{InfinitesimalSite/Filtration.lean} and described in Section~\ref{sec:site}. None of them requires building or checking a divided power structure. Divided powers enter only when $\Ocris$ is applied, and only through the universal property \lean{IsDPEnvelope}.
+
+\subsection{Nothing is lost when \texorpdfstring{$p$}{p} is nilpotent}
+
+The restriction to bounded exponents costs nothing when $p$ is nilpotent.
+
+\begin{lemma}\label{lem:pd-exponent}
+Let $n$ be an integer with $n! = 0$ in $A$, let $D$ be an $A$-algebra and let $K \subseteq D$ be an ideal with divided powers $\delta$. Then $x^{n} = 0$ for every $x \in K$.
+\end{lemma}
+
+\begin{proof}
+By induction on $m$, using $\delta_1(x) = x$ and $\delta_m(x)\delta_k(x) = \binom{m+k}{m}\delta_{m+k}(x)$, one gets $x^m = m!\,\delta_m(x)$. Hence $x^{n} = n!\,\delta_{n}(x)$, which vanishes because $n! = 0$ in $A$.
+\end{proof}
+
+\leanref{\lean{dividedPowers_pow_eq_zero_of_factorial_eq_zero} in \lean{InfinitesimalSite/Envelope.lean}; the identity $x^m = m!\,\delta_m(x)$ is Mathlib's \lean{DividedPowers.factorial_mul_dpow_eq_pow}.}
+
+Neither $p$ nor a compatibility of $\delta$ with $\gamma$ is needed. When $p$ is nilpotent, the hypothesis of the lemma holds for suitable $n$.
+
+\begin{corollary}\label{cor:pd-exponent-nilpotent}
+Let $N \ge 0$ be an integer with $p^N = 0$ in $A$. Then $(p^N)! = 0$ in $A$. In particular, $x^{p^N} = 0$ for every element $x$ of an ideal with divided powers of an $A$-algebra.
+\end{corollary}
+
+\begin{proof}
+The integer $p^N$ divides $(p^N)!$, and the second statement is Lemma~\ref{lem:pd-exponent} for $n = p^N$.
+\end{proof}
+
+\leanref{\lean{natCast_factorial_pow_eq_zero}, \lean{dividedPowers_bounded}, in \lean{InfinitesimalSite/Envelope.lean}.}
+
+The bound $n$ of Lemma~\ref{lem:pd-exponent} depends only on $A$, not on $D$ or $\delta$. So, if $n! = 0$ in $A$, an $A$-algebra map from $B$ to an $A$-algebra with divided powers that sends $\ker(B \twoheadrightarrow C)$ into the divided power ideal kills the $n$-th powers of the elements of $\ker(B \twoheadrightarrow C)$. Truncating $B$ by these powers therefore does not change its divided power envelope (Lemma~\ref{lem:truncation-envelope}), and the cohomology of $\Ocris$ is computed on the single site of thickenings of exponent $n$ (Theorem~\ref{thm:adjunction-derived}). We use $n = p^e$, for which the condition $(p^e)! = 0$ holds as soon as $p$ is nilpotent enough in $A$ (Remark~\ref{rem:valuation}). This uniformity is why we ask for a bounded exponent and not merely for a nil kernel.
+
+\subsection{Comparison with the usual crystalline site}\label{subsec:comparison}
+
+In Berthelot's crystalline site \cite{berthelot,berthelot-ogus}, objects are divided power thickenings $U \hookrightarrow T$ with $U$ open in $X = \Spec(C)$, the topology is the Zariski (or étale) topology, and the structure sheaf sends such an object to $\mathcal{O}_T$. For affine $X$ its cohomology is the derived limit of the tautological diagram $(B \twoheadrightarrow C) \mapsto B$ over the category of affine divided power thickenings of $C$ \cite[Tags~07HM, 07JK]{stacks}. In $\INF(C/A)$ every object is a thickening of all of $\Spec(C)$, objects carry no divided powers, and the topology is chaotic.
+
+\spa
+
+The second difference is the value of the structure sheaf. On an object $\pi \colon B \twoheadrightarrow C$ of the infinitesimal site, $\Ocris$ is a compatible divided power envelope of $(B, \ker(\pi))$. That $R\Gamma(\INF(C/A), \Ocris)$ agrees with the cohomology of Berthelot's site is classical: both are computed by the de Rham complex of a divided power envelope of a polynomial presentation (Theorem~\ref{thm:main} and \cite[Tag~07LG]{stacks}), and alternatively both are derived limits that can be compared through the envelope functor, which is left adjoint to the functor forgetting divided powers \cite[Tag~07JK]{stacks}. This agreement is not formalised (Section~\ref{sec:scope}).
+
+%======================================================================
+\section{The bounded-exponent infinitesimal site}\label{sec:site}
+%======================================================================
+
+\subsection{Objects and morphisms}
+
+We write $\INF(C/A)$ for the category of Definition~\ref{def:thickening}, and call it the \emph{big infinitesimal site} of $C$ over $A$: every object is a thickening of $\Spec(C)$ itself, with arbitrary $B$, and the upper case follows Berthelot's notation for big sites. In Lean it is \lean{InfinitesimalThickening A C}, in \lean{InfinitesimalSite/Basic.lean}. The fields of an object are a carrier ring with an $A$-algebra structure, the map \texttt{$\pi$}, the field \lean{surjective}, and the field \lean{kernel_bounded}; no polynomial presentation is chosen or stored. A morphism is \lean{InfinitesimalThickening.Hom}, with fields \lean{toAlgHom} and \lean{overC}. A morphism $f$ automatically sends $\ker(\pi)$ into $\ker(\pi')$, so there is no further compatibility to check.
+
+\subsection{Exponents and the Frobenius levels \texorpdfstring{$\INF_e$}{INF\_e}}
+
+\begin{definition}
+Let $X = (B, \pi)$ be an object of $\INF(C/A)$ and $m \in \N$. The object $X$ \emph{has exponent} $m$ if $x^m = 0$ for every $x \in \ker(\pi)$. The \emph{Frobenius exponent} $\exp(X)$ is the least $e \in \N$ such that $X$ has exponent $p^e$, that is, such that $x \mapsto x^{p^e}$ kills $\ker(\pi)$. For $e \in \N$, the \emph{Frobenius level} $\INF_e \subseteq \INF(C/A)$ is the full subcategory of objects having exponent $p^e$.
+\end{definition}
+
+Every object has some exponent $m$, hence the exponent $p^m \ge m$, so $\exp(X)$ is well defined. In Lean, \lean{Level A C m} is the full subcategory of objects of exponent $m$, for an arbitrary $m \in \N$, and $\INF_e$ is \lean{Level A C (p ^ e)}. The Frobenius exponent is defined for every integer $p > 1$.
+
+\begin{proposition}\label{prop:levels}
+Let $X$ be an object of $\INF(C/A)$ and let $e \le e'$ be integers.
+\begin{itemize}
+\item[\normalfont{(1)}] If $X$ has exponent $p^e$, then it has exponent $p^{e'}$; in particular $\INF_e \subseteq \INF_{e'}$.
+\item[\normalfont{(2)}] The object $X$ lies in $\INF_e$ if and only if $\exp(X) \le e$.
+\item[\normalfont{(3)}] The object $X$ lies in $\INF_{\exp(X)}$, so $\INF(C/A)$ is the increasing union of the Frobenius levels.
+\end{itemize}
+\end{proposition}
+
+\leanref{\lean{HasExponent}, \lean{HasExponent.mono}, \lean{frobeniusExponent} (the Frobenius exponent $\exp(X)$, defined by \lean{Nat.find}), \lean{frobeniusExponent_le_iff}, \lean{hasExponent_pow_frobeniusExponent}, \lean{Level}, \texttt{Level.$\iota$}, \lean{Level.exponentLE_pow_mono}, \lean{Level.inclPow}, \lean{Level.ofObjFrobenius}, \lean{Level.exists_frobenius_level}. For arbitrary exponents: \lean{exponent}, the least $m$ such that $X$ has exponent $m$, with \lean{exponent_le_iff}, \lean{Level.incl}, \lean{Level.exists_level}, and \lean{exponent_le_pow_frobeniusExponent}, which bounds it by $p^{\exp(X)}$.}
+
+\subsection{Truncation}
+
+For an ideal $K$ of a ring and $m \in \N$, let $\pow(K, m)$ be the ideal generated by $\{x^m : x \in K\}$.
+
+\begin{lemma}\label{lem:powideal}
+Let $K$ be an ideal of a ring and let $m > 0$. Then $\pow(K,m) \subseteq K$. If $f$ is a ring map with $f(x)^m = 0$ for all $x \in K$, then $\pow(K,m) \subseteq \ker(f)$.
+\end{lemma}
+
+\leanref{\lean{powIdeal}, \lean{pow_mem_powIdeal}, \lean{powIdeal_le}, \lean{powIdeal_le_ker}.}
+
+Let $\pi \colon B \twoheadrightarrow C$ be a surjection of $A$-algebras and let $e \in \N$. We truncate $B$ by the ideal generated by the $p^e$-th powers of elements of the kernel:
+\[
+T_e(B) \;\coloneqq\; B \,\big/\, \pow(\ker(\pi), p^e) \;=\; B \,\big/\, \big( x^{p^e} \;:\; x \in \ker(\pi) \big).
+\]
+
+\begin{proposition}\label{prop:truncation}
+Let $\pi \colon B \twoheadrightarrow C$ be a surjection of $A$-algebras and let $e \in \N$. The kernel of the induced map $T_e(B) \twoheadrightarrow C$ is the image of $\ker(\pi)$, and $T_e(B) \twoheadrightarrow C$ is an object of $\INF_e$. Every $A$-algebra map $f \colon B \to Y$ over $C$, with $Y$ in $\INF_e$, factors uniquely through $B \twoheadrightarrow T_e(B)$.
+\end{proposition}
+
+\begin{proof}
+Since $p^e > 0$, $\pow(\ker(\pi), p^e) \subseteq \ker(\pi)$ by Lemma~\ref{lem:powideal}, so $\pi$ factors through $T_e(B)$, and as $B \twoheadrightarrow T_e(B)$ is surjective the kernel of $T_e(B) \twoheadrightarrow C$ is the image of $\ker(\pi)$; the $p^e$-th power of the class of $x \in \ker(\pi)$ is the class of $x^{p^e} \in \pow(\ker(\pi), p^e)$, hence zero.
+
+Since $\pi_Y \circ f = \pi$, the map $f$ sends $\ker(\pi)$ into $\ker(\pi_Y)$, so it kills $p^e$-th powers of elements of $\ker(\pi)$ and, by Lemma~\ref{lem:powideal}, the ideal $\pow(\ker(\pi), p^e)$. It therefore factors through the quotient, and the factorisation is unique because $B \twoheadrightarrow T_e(B)$ is surjective.
+\end{proof}
+
+\leanref{\lean{InfinitesimalThickening.truncate}, \lean{truncate_hasExponent}, \lean{truncateLift}, \lean{truncateLift_comp_mk}, \lean{truncate_hom_ext}, \lean{ker_truncate_eq_map}; the truncation is defined by $m$-th powers for every $m > 0$, and $T_e$ is the case $m = p^e$.}
+
+The kernels we need are in general not finitely generated: for the kernel of $A[x_c : c \in C] \twoheadrightarrow C$, there is one variable for each element of $C$. For such kernels a bounded exponent is strictly weaker than nilpotence of the ideal.
+
+\begin{example}
+Consider the surjection $\F_p[y_1, y_2, \dots]/(y_1^p, y_2^p, \dots) \twoheadrightarrow \F_p$ sending every $y_i$ to $0$. Every element of the kernel has vanishing $p$-th power, because the Frobenius is additive and every monomial in the kernel is divisible by some $y_i$, so this object lies in $\INF_1$. The kernel is not nilpotent, since $y_1 \cdots y_n \ne 0$ lies in its $n$-th power for every $n$.
+\end{example}
+
+Divided power ideals behave in the same way: when $(p^e)! = 0$ in $A$, every element of a divided power ideal of an $A$-algebra has vanishing $p^e$-th power by Lemma~\ref{lem:pd-exponent}, while the ideal need not be nilpotent. This is why the truncation uses the ideal of $p^e$-th powers and not a power of the kernel.
+
+For an object $X = (B, \pi)$ of $\INF(C/A)$ we write $T_e(X)$ for the object $T_e(B) \twoheadrightarrow C$ of $\INF_e$, and $u_X \colon X \twoheadrightarrow T_e(X)$ for the quotient map $B \twoheadrightarrow T_e(B)$, a morphism of $\INF(C/A)$. Let $\iota_e \colon \INF_e \hookrightarrow \INF(C/A)$ be the inclusion.
+
+\begin{theorem}\label{thm:adjunction}
+Let $e \in \N$. The assignment $X \mapsto T_e(X)$ extends to a functor $T_e \colon \INF(C/A) \to \INF_e$, which is left adjoint to $\iota_e$. The unit of the adjunction at $X$ is $u_X$.
+\end{theorem}
+
+\begin{proof}
+For a morphism $f \colon X \to Y$, Proposition~\ref{prop:truncation} applied to $u_Y \circ f$ gives a unique $T_e(f) \colon T_e(X) \to T_e(Y)$ with $T_e(f) \circ u_X = u_Y \circ f$; functoriality follows from uniqueness. For $Y$ in $\INF_e$, Proposition~\ref{prop:truncation} says that composition with $u_X$ is a bijection
+\[
+\Hom_{\INF_e}\big(T_e(X), Y\big) \;\simeq\; \Hom_{\INF(C/A)}\big(X, \iota_e(Y)\big),
+\]
+and this bijection is natural in $X$ and $Y$ because $T_e(f) \circ u_X = u_Y \circ f$.
+\end{proof}
+
+\leanref{\lean{Level.truncation}, \lean{InfinitesimalThickening.toTruncate}, \lean{Level.toTruncate_comp_truncation_map}, \lean{Level.truncation_hom_ext}, \lean{Level.truncationHomEquiv}, \lean{Level.truncationAdjunction}, \lean{Level.truncationAdjunction_unit_app}, in \lean{InfinitesimalSite/Filtration.lean}. The inclusion $\iota_e$ is \texttt{Level.$\iota$}.}
+
+\subsection{Binary coproducts}
+
+\begin{proposition}\label{prop:coproducts}
+Let $e \in \N$ and let $X = (B, \pi)$ and $X' = (B', \pi')$ be objects of $\INF_e$. The truncation of the map $B \otimes_A B' \twoheadrightarrow C$ sending $b \otimes b'$ to $\pi(b)\,\pi'(b')$ is a coproduct of $X$ and $X'$ in $\INF_e$. In particular $\INF_e$ has binary coproducts, i.e.\ binary products in the site orientation $\INF_e^{\mathrm{op}}$.
+\end{proposition}
+
+\begin{proof}
+For maps $f \colon X \to Y$ and $g \colon X' \to Y$, the map out of the coproduct is the factorisation given by Proposition~\ref{prop:truncation} of $b \otimes b' \mapsto f(b) g(b')$. Uniqueness follows from $b \otimes b' = (b \otimes 1)(1 \otimes b')$.
+\end{proof}
+
+\leanref{\lean{Level.coprod}, \lean{Level.inl}, \lean{Level.inr}, \lean{Level.coprodDesc}, \lean{Level.coprod_hom_ext}, \lean{Level.coprodCofanIsColimit}, instance \lean{Level.hasBinaryCoproducts} for \lean{Level A C m} under \lean{NeZero m}, applied to $m = p^e$.}
+
+\subsection{The weakly initial object and the Čech nerve}
+
+For an object $Y = (B', \pi')$ let $S(Y)$ be the set of maps of sets $s \colon C \hookrightarrow B'$ with $\pi' \circ s = \mathrm{id}$. It is nonempty because $\pi'$ is surjective, and it is functorial in $Y$. Write $[n] \coloneqq \{0, \dots, n\}$. For $n \ge 0$ let $X_e(n)$ be the truncation $T_e$ of the map $A[x_{i,c} : i \in [n],\ c \in C] \twoheadrightarrow C$ sending $x_{i,c}$ to $c$, that is, the quotient of the polynomial ring by the $p^e$-th powers of the elements of the kernel.
+
+\leanref{\lean{InfinitesimalThickening.Sections}, \lean{sections_nonempty}, \lean{Sections.map}, \lean{Level.cechObj}; the object $X_e(n)$ is \lean{Level.cechObj (p ^ e) n}.}
+
+A map $\theta \colon [m] \to [n]$ induces the morphism $X_e(m) \to X_e(n)$ sending $x_{i,c}$ to $x_{\theta(i),c}$ (\lean{cechMap}).
+
+\begin{proposition}\label{prop:cech-hom}
+Let $e, n \ge 0$ and let $Y$ be an object of $\INF_e$. Maps $X_e(n) \to Y$ correspond bijectively to $(n+1)$-tuples $(s_0, \dots, s_n)$ of elements of $S(Y)$, via $x_{i,c} \mapsto s_i(c)$. The bijection is natural in $Y$, and precomposition with the map induced by $\theta \colon [m] \to [n]$ corresponds to $s \mapsto s \circ \theta$. In particular $X_e(0)$ maps to every object of $\INF_e$.
+\end{proposition}
+
+\leanref{\lean{Level.cechHomEquiv}, \lean{cechHomEquiv_cechMap}, \lean{cechHomEquiv_comp}, \lean{Level.nonempty_hom_cechObj_zero}.}
+
+Restricted to monotone maps, these renamings of variables give a cosimplicial object $X_e(\bullet)$ of $\INF_e$ (\lean{Level.cechNerve}, \lean{cechMap}, \lean{cechMap_id}, \lean{cechMap_comp}). In the site orientation, $X_e(0)$ is weakly final, $\INF_e$ has binary products, and $X_e(\bullet)$ is the Čech nerve of $X_e(0)$ by Proposition~\ref{prop:cech-hom}; these are the hypotheses of \cite[Tag~07JM]{stacks}. The polynomial rings are only a device in proofs: they enter neither the definition of the site nor that of $\Ocris$ or of $R\Gamma(\INF(C/A), \Ocris)$; they appear only through the objects $X_e(n)$ in the statements of Theorems~A and~B.
+
+\begin{remark}\label{rem:general-exponent}
+Proposition~\ref{prop:truncation}, Theorem~\ref{thm:adjunction} and Propositions~\ref{prop:coproducts} and~\ref{prop:cech-hom} only use that $p^e$ is a positive integer. For every integer $m > 0$ they hold, with the same proofs, for the full subcategory of thickenings of exponent $m$, with the truncation by $m$-th powers in place of $T_e$. This is the generality of the Lean statements, which concern \lean{Level A C m} under \lean{NeZero m}; the Frobenius level $\INF_e$ is the case $m = p^e$.
+\end{remark}
+
+\subsection{The topology}
+
+The site $\INF(C/A)$ carries the chaotic topology, i.e.\ Mathlib's bottom Grothendieck topology on the opposite category; we use the chaotic topology on $\INF_e$ as well. Every presheaf is a sheaf for it; for $\Ocris$ this is \lean{isOcrisSheaf_chaotic}, with the topology packaged as \lean{TopologyData.chaotic}. For the chaotic topology, sheaf cohomology is the right derived functor of the limit, and we take this as the definition of $R\Gamma$ (Section~\ref{subsec:derived}); the Lean statements use the derived limit directly. This does not make higher cohomology vanish.
+
+%======================================================================
+\section{The structure sheaf \texorpdfstring{$\Ocris$}{Ocris}}\label{sec:ocris}
+%======================================================================
+
+From now on we work in the following setting.
+
+\begin{setting}\label{Setting:s}
+Let $p$ be a prime, $A$ a ring and $I \subseteq A$ an ideal with divided powers $\gamma$, such that $p \in I$ and $p$ is nilpotent in $A$. Let $e$ be a positive integer with $(p^e)! = 0$ in $A$, and let $C$ be an $A$-algebra with $I \cdot C = 0$.
+\end{setting}
+
+\begin{remark}\label{rem:valuation}
+Since $p$ is nilpotent in $A$, every integer prime to $p$ is a unit in $A$, so the prime-to-$p$ part of $(p^e)!$ is a unit. By Legendre's formula, the $p$-adic valuation of $(p^e)!$ is $1 + p + \dots + p^{e-1} = (p^e-1)/(p-1)$. Hence the hypothesis $(p^e)! = 0$ holds if and only if $p^{(p^e-1)/(p-1)} = 0$ in $A$. If $p^N = 0$ in $A$, it holds for $e = N$ by Corollary~\ref{cor:pd-exponent-nilpotent}, and already for the least $e$ with $(p^e-1)/(p-1) \ge N$, that is, with $p^e \ge (p-1)N + 1$. For this $e$ the exponent $p^e$ of the objects of $\INF_e$ is smaller than $p\big((p-1)N + 1\big)$, which is linear in $N$, whereas the choice $e = N$ gives the exponent $p^N$. This remark is not formalised; the library uses only Corollary~\ref{cor:pd-exponent-nilpotent}.
+\end{remark}
+
+In Lean the conditions on $p$ form the class \lean{IsCrystallineBase p A I}, the condition on $e$ is the hypothesis \texttt{he : ((Nat.factorial (p \textasciicircum{} e) : $\mathbb{N}$) : A) = 0}, and $I \cdot C = 0$ is the hypothesis \lean{hIC : I.map (algebraMap A C)}~$= \bot$. We refer to Setting~\ref{Setting:s} as the Basic Setting. For an object $X = (B, \pi)$ of $\INF(C/A)$ we write $J_X \coloneqq \ker(\pi)$.
+
+\subsection{Envelopes as chosen data}
+
+\begin{definition}\label{def:envelope}
+Let $B$ be an $A$-algebra and $J \subseteq B$ an ideal. A \emph{compatible divided power envelope} of $(B,J)$ is an $A$-algebra $D$ with a map $\varphi \colon B \to D$, an ideal $K \supseteq JD + ID$ and divided powers $\delta$ on $K$ compatible with $\gamma$, that is, such that $A \to D$ is a morphism of divided power rings, with the following property. For every $A$-algebra $D'$, every $A$-algebra map $\varphi' \colon B \to D'$ and all divided powers $\delta'$ on an ideal $K' \supseteq \varphi'(J)D' + ID'$ compatible with $\gamma$, there is a unique morphism of divided power algebras $\psi \colon D \to D'$ with $\psi \circ \varphi = \varphi'$.
+\end{definition}
+
+This is the predicate \lean{IsDPEnvelope}, defined in \lean{PDDifferentials.lean}; \lean{DPEnvelopeChoice} bundles the data and \lean{HasDPEnvelope} is the propositional existence class. The ideal $K$ is part of the data. One can show that it is the divided power ideal generated by $J$ and $I$; this is neither formalised nor used. It is in general strictly larger than $JD + ID$. For example, let $A = \mathbb{Z}/p^N$ with $I = pA$ and its canonical divided powers, $B = A[x]$ and $J = (x)$. The envelope is $A\langle x \rangle$, and $x^{[p]} \in K$ but $x^{[p]} \notin (x,p)A\langle x \rangle$: since $x \cdot x^{[k]} = (k+1)\,x^{[k+1]}$, every element of $(x,p)A\langle x\rangle$ has its coefficient of $x^{[p]}$ in $pA$.
+
+\spa
+
+For an object $X$ of $\INF(C/A)$, \lean{EnvelopeChoice X} (in \lean{InfinitesimalSite/Envelope.lean}) packages an envelope $(D_X, \varphi_X, K_X, \delta_X)$ of $(B, J_X)$. An \emph{envelope family} $E$ (\lean{EnvelopeFamily}) is a choice of such an envelope for every object of $\INF(C/A)$. Every result about $\Ocris$ is stated for an arbitrary envelope family. By Theorem~\ref{thm:envelope-existence} an envelope family exists (\lean{envelopeExistenceData}, \lean{envelopeFamily} in \lean{MainTheorems.lean}).
+
+\subsection{Existence of envelopes}
+
+\begin{theorem}\label{thm:envelope-existence}
+Let $(A, I, \gamma)$ be a divided power ring, $B$ an $A$-algebra and $J \subseteq B$ an ideal. Then $(B, J)$ has a compatible divided power envelope.
+\end{theorem}
+
+\begin{proof}
+We follow the representability argument of \cite[Tags~07H8, 07GV, 07GW]{stacks}, with an explicit indexing set; there $IB \subseteq J$ is assumed, and Definition~\ref{def:envelope} is the envelope of $J + IB$. Let $R \coloneqq B[X_{n,f} : n \ge 0,\ f \in J]$; the variable $X_{n,f}$ stands for $\delta_{n+1}(f)$. For an ideal $\mathfrak{a} \subseteq R$, let $K(\mathfrak{a}) \subseteq R/\mathfrak{a}$ be the ideal generated by the classes of the variables and by the image of $I$. Call a pair $(\mathfrak{a}, \delta)$, with $\delta$ divided powers on $K(\mathfrak{a})$, \emph{admissible} if the class of every $f \in J$ lies in $K(\mathfrak{a})$, $X_{n,f} = \delta_{n+1}(f)$ in $R/\mathfrak{a}$, and $A \to R/\mathfrak{a}$ is a morphism of divided power rings. Admissible pairs form a set $S$. Let $\mathfrak{b}$ be the kernel of $R \to \prod_{s \in S} R/\mathfrak{a}_s$ and $D \coloneqq R/\mathfrak{b}$. The product of the ideals $K(\mathfrak{a}_s)$ carries the componentwise divided powers, and the ideal $K(\mathfrak{b})$ of $D \hookrightarrow \prod_s R/\mathfrak{a}_s$ is stable under them. Indeed, it suffices to check this on generators, and for $m \ge 1$ we have $\delta_m(X_{n,f}) = \frac{(m(n+1))!}{m!\,((n+1)!)^m}\, X_{m(n+1)-1,f}$ (because $X_{n,f} = \delta_{n+1}(f)$ in each factor) and $\delta_m(a) = \gamma_m(a)$ for $a \in I$, uniformly in $s$. So $K(\mathfrak{b})$ has divided powers, compatible with $\gamma$ and containing $JD + ID$ (the class of $f$ equals that of $X_{0,f}$ in every factor).
+
+Let $(D', K', \delta')$ and $\varphi' \colon B \to D'$ be as in Definition~\ref{def:envelope}. Let $\mathfrak{a}$ be the kernel of the evaluation $R \to D'$ sending $X_{n,f}$ to $\delta'_{n+1}(\varphi'(f))$. Then $R/\mathfrak{a} \hookrightarrow D'$ and $K(\mathfrak{a}) \subseteq K'$, since $\varphi'(J) \subseteq K'$ and $ID' \subseteq K'$. The ideal $K(\mathfrak{a})$ is stable under $\delta'$ by the same computation, the class of $f \in J$ equals that of $X_{0,f}$ because $\delta'_1(\varphi'(f)) = \varphi'(f)$, and so the restriction of $\delta'$ makes $\mathfrak{a}$ admissible. The projection $D \twoheadrightarrow R/\mathfrak{a} \hookrightarrow D'$ is the required morphism. It is unique because $D$ is generated over $B$ by the classes of the $X_{n,f} = \delta_{n+1}(f)$.
+\end{proof}
+
+\leanref{\lean{DPEnvelope.hasDPEnvelope}, \lean{DPEnvelope.env_isDPEnvelope}, \lean{DPEnvelope.existsUnique_lift}, \lean{DPEnvelope.IsAdmissible}, \lean{DPEnvelope.envDividedPowers}, \lean{DPEnvelope.envPDIdeal_stab}, \lean{piDividedPowers}, \lean{restrictDividedPowers}, \lean{exists_dpow_mem_span}, in \lean{Envelope/Construction.lean}.}
+
+The proof gives no explicit description of $D$, but none is needed: every other result uses envelopes only through their universal property.
+
+\subsection{Consequences of the universal property}
+
+\begin{proposition}\label{prop:envelope-unique}
+Two compatible divided power envelopes of the same $(B, J)$ are isomorphic as $A$-algebras, by mutually inverse comparison maps given by the universal property.
+\end{proposition}
+
+\leanref{\lean{IsDPEnvelope.comparison}, \lean{comparison_spec}, \lean{identity_spec}, \lean{comp_spec}, \lean{IsDPEnvelope.comparisonEquiv}, \lean{DPEnvelopeChoice.hom_ext}.}
+
+\begin{proposition}\label{prop:functoriality}
+Let $E$ be an envelope family. For a morphism $f \colon X \to Y$ of $\INF(C/A)$ there is a unique morphism of divided power algebras $c(f) \colon D_X \to D_Y$ with $c(f) \circ \varphi_X = \varphi_Y \circ f$. Moreover $c(\mathrm{id}_X) = \mathrm{id}$ and $c(g \circ f) = c(g) \circ c(f)$, and for two choices of envelope at the same $X$ the maps $c(\mathrm{id}_X)$ in the two directions are mutually inverse.
+\end{proposition}
+
+\begin{proof}
+Apply the universal property of $D_X$ to $\varphi_Y \circ f$; this is possible because $f(J_X) \subseteq J_Y$. The identities follow from uniqueness.
+\end{proof}
+
+\leanref{\lean{EnvelopeChoice.comparison}, \lean{comparison_spec}, \lean{comparison_id}, \lean{comparison_comp}, \lean{comparison_comp_comparison_left}, \lean{comparison_comp_comparison_right}.}
+
+\begin{corollary}\label{cor:ocris}
+The assignment $X \mapsto D_X$ is a functor from $\INF(C/A)$ to commutative $A$-algebras, i.e.\ a presheaf of rings $\Ocris$ on the site. Two envelope families give isomorphic presheaves.
+\end{corollary}
+
+\leanref{\lean{ocris}, \lean{ocrisCommRing}, \lean{ocris_map_spec}, \lean{ocrisOfExistenceData}, \lean{envelopeFamilyIso}, \lean{ocrisFamilyIso}.}
+
+No proof looks inside $D_X$; everything goes through \lean{IsDPEnvelope}.
+
+\subsection{The projection to \texorpdfstring{$C$}{C}}
+
+The next result identifies the divided power ideal of an envelope with a kernel.
+
+\begin{theorem}\label{thm:projection}
+Assume the Basic Setting, let $E$ be an envelope family and let $X = (B, \pi)$ be an object of $\INF(C/A)$. There is a unique morphism of divided power algebras $q \colon D_X \to C$, for the zero divided power ideal of $C$, such that $q \circ \varphi_X = \pi$. The map $q$ is surjective and
+\[
+\ker(q) \;=\; K_X .
+\]
+In particular $x^{p^e} = 0$ for every $x \in \ker(q)$. If $q'$ is the corresponding map for an object $Y$ and $f \colon X \to Y$ is a morphism, then $q' \circ c(f) = q$.
+\end{theorem}
+
+\begin{proof}
+Existence and uniqueness of $q$ follow from the universal property, since $I\cdot C = 0$ and $\pi(J_X) = 0$. Since $q$ is a morphism of divided power algebras into $(C, 0)$, we have $K_X \subseteq \ker(q)$. Conversely, since $J_X D_X + I D_X \subseteq K_X$ and $\pi$ is surjective, $D_X \twoheadrightarrow D_X/K_X$ induces a map $i \colon C \to D_X/K_X$ with $i \circ \pi = (D_X \twoheadrightarrow D_X/K_X) \circ \varphi_X$. The projection $D_X \twoheadrightarrow D_X/K_X$ and $i \circ q$ are then two morphisms of divided power algebras into $(D_X/K_X, 0)$ solving the same universal problem, so they agree; hence $\ker(q) \subseteq K_X$. The exponent bound is Lemma~\ref{lem:pd-exponent} for $n = p^e$. Finally, $q' \circ c(f)$ and $q$ are morphisms of divided power algebras with $q' \circ c(f) \circ \varphi_X = q' \circ \varphi_Y \circ f = \pi$, so they agree by uniqueness.
+\end{proof}
+
+\leanref{\lean{EnvelopeChoice.projection}, \lean{projection_spec}, \lean{existsUnique_projection}, \lean{projection_surjective}, \lean{projectionKernel_eq_dividedPowersIdeal}, \lean{dividedPowers_pow_eq_zero_of_factorial_eq_zero}, \lean{dividedPowers_bounded}, \lean{comparison_overC}.}
+
+\subsection{Envelopes of truncations}
+
+The following lemma is the only place where the bound of Lemma~\ref{lem:pd-exponent} enters the comparison of $\INF(C/A)$ with $\INF_e$. Recall the quotient maps $u_X \colon X \twoheadrightarrow T_e(X)$ of Theorem~\ref{thm:adjunction}.
+
+\begin{lemma}\label{lem:truncation-envelope}
+Assume the Basic Setting.
+\begin{itemize}
+\item[\normalfont{(1)}] Let $\pi \colon B \twoheadrightarrow C$ be a surjection of $A$-algebras. A compatible divided power envelope of $T_e(B)$, with respect to the kernel of $T_e(B) \twoheadrightarrow C$ and composed with $B \twoheadrightarrow T_e(B)$, satisfies the universal property of a compatible divided power envelope of $(B, \ker(\pi))$.
+\item[\normalfont{(2)}] Let $E$ be an envelope family. For every object $X$ of $\INF(C/A)$ the map $c(u_X) \colon D_X \to D_{T_e(X)}$ of Proposition~\ref{prop:functoriality} is bijective, and these maps form an isomorphism of functors $\Ocris \simeq \Ocris \circ \iota_e \circ T_e$ on $\INF(C/A)$.
+\end{itemize}
+\end{lemma}
+
+\begin{proof}
+For (1), let $\varphi' \colon B \to D'$ be a map sending $J \coloneqq \ker(\pi)$ into an ideal $K'$ with divided powers compatible with $\gamma$. For $x \in J$, Lemma~\ref{lem:pd-exponent} for $n = p^e$ gives $\varphi'(x)^{p^e} = 0$, so $\varphi'$ kills $\pow(J, p^e)$ by Lemma~\ref{lem:powideal} and factors through $T_e(B)$, whose kernel is the image of $J$ by Proposition~\ref{prop:truncation}. The universal property of the envelope of $T_e(B)$ concludes.
+
+\spa
+
+For (2), write $X = (B, \pi)$. By (1), applied to $\varphi_X$, there is a morphism of divided power algebras $\psi \colon D_{T_e(X)} \to D_X$ with $\psi \circ \varphi_{T_e(X)} \circ u_X = \varphi_X$. Then $\psi \circ c(u_X)$ is a morphism of divided power algebras with $\psi \circ c(u_X) \circ \varphi_X = \varphi_X$, hence the identity by the universal property of $D_X$. Similarly $c(u_X) \circ \psi \circ \varphi_{T_e(X)}$ and $\varphi_{T_e(X)}$ agree after composition with $u_X$, hence agree since $u_X$ is surjective, and $c(u_X) \circ \psi$ is the identity by the universal property of $D_{T_e(X)}$. Naturality in $X$ follows from Proposition~\ref{prop:functoriality} and the identity $T_e(f) \circ u_X = u_Y \circ f$ of Theorem~\ref{thm:adjunction}.
+\end{proof}
+
+\leanref{\lean{truncIdeal_le_ker_of_dividedPowers}, \lean{EnvelopeChoice.truncate_isInitial}, \lean{EnvelopeChoice.comparison_toTruncate_bijective}, \lean{EnvelopeFamily.isIso_ocrisModuleLarge_map_toTruncate}, \lean{EnvelopeFamily.ocrisTruncationIso}, in \lean{Ocris/Filtration.lean}. They are stated for the truncation by $m$-th powers, for every $m > 0$ with $m! = 0$ in $A$, and the lemma is the case $m = p^e$. Statement (1) is the existence-and-uniqueness clause of Definition~\ref{def:envelope}; the other two conditions follow from those of the envelope of $T_e(B)$.}
+
+\subsection{Derived global sections}\label{subsec:derived}
+
+The derived global sections $R\Gamma(\INF(C/A), \Ocris)$ are, by definition, the right derived functor of the limit applied to the diagram of $A$-modules underlying $\Ocris$. They are computed with injective resolutions in the functor category, which has enough injectives by Theorem~\ref{thm:enough-injectives}. In Lean this object of the homotopy category is \lean{ocrisDerivedGlobalSections E}; for universe reasons the diagram takes values in \lean{ModuleCat.{u+1} A}, through \lean{ULift}. Neither the derived nor the underived global sections depend on the envelope family (\lean{ocrisDerivedGlobalSectionsIso}, \lean{ocrisGlobalSectionsIso}).
+
+\spa
+
+For $e \in \N$, the derived global sections $R\Gamma(\INF_e, \Ocris)$ are defined in the same way from the restriction $\Ocris \circ \iota_e$ of this diagram to $\INF_e$ (\lean{levelOcrisModule}).
+
+\begin{theorem}\label{thm:adjunction-derived}
+Assume the Basic Setting and let $E$ be an envelope family. There is an isomorphism in the homotopy category of complexes of $A$-modules
+\[
+R\Gamma(\INF(C/A), \Ocris) \;\simeq\; R\Gamma(\INF_e, \Ocris).
+\]
+\end{theorem}
+
+\begin{proof}
+By Theorem~\ref{thm:adjunction}, the truncation $T_e \colon \INF(C/A) \to \INF_e$ is left adjoint to the inclusion $\iota_e$. Theorem~\ref{thm:derived-left-adjoint}, applied to $T_e$ and to $\Ocris \circ \iota_e$, gives an isomorphism
+\[
+R\lim{}_{\INF_e}(\Ocris \circ \iota_e) \;\simeq\; R\lim{}_{\INF(C/A)}(\Ocris \circ \iota_e \circ T_e).
+\]
+The left-hand side is $R\Gamma(\INF_e, \Ocris)$. By Lemma~\ref{lem:truncation-envelope}(2), $\Ocris \circ \iota_e \circ T_e$ is isomorphic to $\Ocris$, so the right-hand side is isomorphic to $R\lim_{\INF(C/A)}(\Ocris) = R\Gamma(\INF(C/A), \Ocris)$.
+\end{proof}
+
+\leanref{\lean{EnvelopeFamily.ocrisDerivedGlobalSectionsIsoLevel}, \lean{levelOcrisModule}, \lean{Level.truncationAdjunction}, \lean{Cohomology.derivedLimitIsoOfAdjunction}, \lean{EnvelopeFamily.ocrisTruncationIso}, in \lean{Ocris/Filtration.lean}. In Lean the isomorphism is proved on \lean{Level A C m} for every $m > 0$ with $m! = 0$ in $A$.}
+
+The proof uses the single site $\INF_e$; no limit over $e$ is involved.
+
+\subsection{The structure sheaf on the Čech objects}
+
+For $n \ge 0$ let $P_n \coloneqq A[x_{i,c} : i \in [n],\ c \in C]$, with the map $P_n \twoheadrightarrow C$ sending $x_{i,c}$ to $c$, and let $D(n) \coloneqq \Ocris(X_e(n))$ be the envelope chosen by $E$ at $X_e(n)$.
+
+\begin{proposition}\label{prop:cech-envelope}
+Assume the Basic Setting. For every $n \ge 0$, the algebra $D(n)$, with the composite $P_n \twoheadrightarrow X_e(n) \to D(n)$, satisfies the universal property of the compatible divided power envelope of $P_n \twoheadrightarrow C$.
+\end{proposition}
+
+\begin{proof}
+The object $X_e(n)$ is the truncation of $P_n \twoheadrightarrow C$, so this is Lemma~\ref{lem:truncation-envelope}(1).
+\end{proof}
+
+\leanref{\lean{ocrisCech_isEnvelope}, in \lean{Ocris/Filtration.lean}.}
+
+Thus the Čech complex $n \mapsto \Ocris(X_e(n))$ is the complex $n \mapsto D(n)$ of envelopes of the polynomial presentations, as in \cite[Tag~07JM]{stacks}.
+
+\subsection{The de Rham complex on the site}
+
+Using the divided power de Rham complex of Section~\ref{sec:pd-derham}, the assignment $X \mapsto \Omega^\bullet_{D_X}$ is a functor from $\INF(C/A)$ to cochain complexes of $A$-modules, with a natural map of complexes $\Omega^\bullet_{D_X} \to \Ocris(X)[0]$ which is the identity in degree $0$. It is independent of the envelope family up to natural isomorphism.
+
+\leanref{\lean{ocrisDeRhamComplex}, \lean{ocrisDeRhamAugmentation}, \lean{ocrisDeRhamComplexIso}, \lean{ocrisDeRhamZeroIso}.}
+
+%======================================================================
+\section{Divided power differentials and de Rham complexes}\label{sec:pd-derham}
+%======================================================================
+
+In this section $B$ is an $A$-algebra and $J \subseteq B$ an ideal with divided powers $\delta$; we write $x\dpow{n} \coloneqq \delta_n(x)$ for $x \in J$. The results follow \cite[Tag~07HQ]{stacks}.
+
+\subsection{Divided power Kähler differentials}
+
+\begin{definition}
+A \emph{PD derivation} of $B$ into a $B$-module $M$ is an $A$-linear map $\theta \colon B \to M$ with $\theta(bb') = b\theta(b') + b'\theta(b)$ for $b, b' \in B$ and $\theta(x\dpow{n}) = x\dpow{n-1}\theta(x)$ for $n \ge 1$ and $x \in J$. The module of \emph{PD Kähler differentials} is
+\[
+\Omega_{B,\delta} \;\coloneqq\; \Omega_{B/A} \big/ \big\langle d(x\dpow{n}) - x\dpow{n-1}\,dx \;:\; n \ge 1,\ x \in J \big\rangle_B ,
+\]
+with $d \colon B \to \Omega_{B,\delta}$ the induced map. For $q \ge 0$ put $\Omega^q_{B,\delta} \coloneqq \bigwedge^q_B \Omega_{B,\delta}$.
+\end{definition}
+
+\begin{proposition}\label{prop:pd-kaehler}
+Let $B$, $J$ and $\delta$ be as above.
+\begin{itemize}
+\item[\normalfont{(1)}] The map $d \colon B \to \Omega_{B,\delta}$ is a PD derivation, and for every $B$-module $M$ composition with $d$ is a bijection from $\Hom_B(\Omega_{B,\delta}, M)$ to the set of PD derivations $B \to M$.
+\item[\normalfont{(2)}] The $B$-module $\Omega_{B,\delta}$ is generated by $dB$.
+\item[\normalfont{(3)}] A morphism of divided power algebras $f \colon (B,\delta) \to (D,\delta')$ induces an $f$-semilinear map $\Omega_{B,\delta} \to \Omega_{D,\delta'}$ with $db \mapsto d f(b)$.
+\end{itemize}
+\end{proposition}
+
+\leanref{\lean{IsPDDerivation}, \lean{pdRelations}, \lean{PDKaehler}, \lean{pdD}, \lean{pdD_isPDDerivation}, \lean{PDKaehler.lift}, \lean{PDKaehler.lift_comp}, \lean{PDKaehler.lift_unique}, \lean{pdKaehlerDerivationEquiv}, \lean{span_range_pdD}, \lean{DeRham.pdKaehlerMap}, \lean{pdKaehlerMap_pdD}, \lean{pdKaehlerMap_smul}.}
+
+\subsection{Square-zero extensions and derivations of envelopes}
+
+\begin{proposition}\label{prop:square-zero}
+Let $M$ be an $A$-module. The ideal $I \oplus M$ of the square-zero extension $A \oplus M$ carries the divided powers given, for $n \ge 1$, by
+\[
+\delta_n(x, z) \;\coloneqq\; \big(\gamma_n(x),\ \gamma_{n-1}(x)\,z\big),
+\]
+and $A \hookrightarrow A \oplus M$ is a morphism of divided power algebras \cite[Tag~07HH]{stacks}. If $\theta \colon D \to M$ is a PD derivation of a divided power algebra $D$, then $b \mapsto (b, \theta(b))$ and the projection $D \oplus M \twoheadrightarrow D$ are morphisms of divided power algebras.
+\end{proposition}
+
+\leanref{\lean{sqZeroDividedPowers}, \lean{sqZero_isDPMorphism} (in \lean{SquareZero.lean}; the composition axiom uses a \lean{Nat.uniformBell} identity), \lean{derivationGraph}, \lean{pdDerivationGraph_isDPMorphism}, \lean{sqZero_fst_isDPMorphism}.}
+
+\begin{theorem}\label{thm:derivation-extension}
+Let $\varphi \colon B \to D$ be an $A$-algebra map and $K$ an ideal of $D$ with divided powers $\delta$ compatible with $\gamma$, $JD + ID \subseteq K$, such that $\varphi$ is initial among maps to compatible divided power algebras sending $J$ into the divided power ideal; for instance, a compatible divided power envelope of $(B, J)$. Here $J$ carries no divided powers. Then every $A$-derivation $v \colon B \to M$ into a $D$-module extends uniquely to a PD derivation $\theta \colon D \to M$ with $\theta \circ \varphi = v$.
+\end{theorem}
+
+\begin{proof}
+Give $D \oplus M$ the divided powers of Proposition~\ref{prop:square-zero} and apply initiality to the map $B \to D \oplus M$ sending $b$ to $(\varphi(b), v(b))$.
+The first component of the resulting morphism $\psi \colon D \to D \oplus M$ is $\mathrm{id}_D$ by uniqueness, and its second component is $\theta$; $\psi(x\dpow{n}) = \psi(x)\dpow{n} = (x\dpow{n}, x\dpow{n-1}\theta(x))$ shows that $\theta$ is a PD derivation. For uniqueness, the graph of any other extension is another such morphism.
+\end{proof}
+
+\leanref{\lean{existsUnique_pdDerivation_extension} (for \lean{IsDPEnvelope}), \lean{existsUnique_pdDerivation_of_initial} (general form, in \lean{Ocris/PDDerivationExtension.lean}).}
+
+The following is \cite[Tag~07HW]{stacks}.
+
+\begin{theorem}\label{thm:envelope-differentials}
+Let $D$ be a compatible divided power envelope of $(B, J)$, with divided powers $\delta$ on $K \subseteq D$. The canonical map $D \otimes_B \Omega_{B/A} \to \Omega_{D,\delta}$ sending $d' \otimes db$ to $d'\, d\varphi(b)$ is an isomorphism of $D$-modules.
+\end{theorem}
+
+\begin{proof}
+Let $\theta \colon D \to D \otimes_B \Omega_{B/A}$ be the PD derivation extending $b \mapsto 1 \otimes db$ (Theorem~\ref{thm:derivation-extension}). Its factorisation through $\Omega_{D,\delta}$ (Proposition~\ref{prop:pd-kaehler}) is the inverse. One composite is the identity on the generators $d' \otimes db$; for the other, both composites with $d$ are PD derivations extending $b \mapsto db$, so they agree by uniqueness.
+\end{proof}
+
+\leanref{\lean{pdKaehlerDpEnvelopeComparison}, \lean{pdKaehler_dpEnvelope}, \lean{pdKaehlerDpEnvelopeEquiv}, in \lean{PDDifferentials.lean} and \lean{Envelope/PDKaehlerComparison.lean}.}
+
+\subsection{Exterior powers of a quotient}
+
+The following lemma of linear algebra is needed to descend the de Rham differential. It is proved in the library because we did not find it in Mathlib.
+
+\begin{lemma}\label{lem:exterior-quotient}
+Let $R$ be a commutative ring, $M$ an $R$-module, $M' \subseteq M$ a submodule and $n \ge 0$. Then
+\[
+\ker\Big(\textstyle\bigwedge^n_R M \twoheadrightarrow \bigwedge^n_R (M/M')\Big) \;=\; \mathrm{span}\big\{ m_1 \wedge \dots \wedge m_n \;:\; m_i \in M' \text{ for some } i \big\}.
+\]
+\end{lemma}
+
+\begin{proof}
+Let $Q$ be the quotient of $\bigwedge^n M$ by the span on the right. Choosing lifts defines an alternating map $(M/M')^n \to Q$, which is well defined because changing a lift changes the wedge by an element with a factor in $M'$. The induced map $\bigwedge^n(M/M') \to Q$ is inverse to the map $Q \to \bigwedge^n(M/M')$.
+\end{proof}
+
+\leanref{\lean{exteriorPower_ker_map_mkQ}, \lean{lift_comp_map_mkQ}, \lean{quotientTermMap_ker}, in \lean{DeRham/ExteriorPowerQuotient.lean}.}
+
+\subsection{The algebraic de Rham complex}
+
+The ordinary de Rham complex \cite[Tag~07HY]{stacks} is built following J.~Riou's approach through presentations of modules, ported to the current Mathlib.
+
+\begin{proposition}\label{prop:presentations}
+Let $R$ be a commutative ring.
+\begin{itemize}
+\item[\normalfont{(1)}] The $A$-algebra $B$ is presented by $A[X_b : b \in B]$ with relations $X_{b_1} + X_{b_2} - X_{b_1+b_2}$, $X_{b_1}X_{b_2} - X_{b_1 b_2}$ and $a - X_{a\cdot 1}$. This induces a presentation of the $B$-module $\Omega_{B/A}$ with generators $db$ and relations given by additivity, the Leibniz rule and $d(a) = 0$ for $a \in A$.
+\item[\normalfont{(2)}] A presentation of an $R$-module $M$ induces a presentation of $\bigwedge^n_R M$, with generators indexed by $n$-tuples of generators and relations coming from one slot, antisymmetry and alternation.
+\item[\normalfont{(3)}] Presentations of finitely many $R$-modules $M_i$ induce a presentation of $\bigotimes_i M_i$.
+\end{itemize}
+\end{proposition}
+
+\leanref{\lean{Presentation.Tautological.algebraPresentation}, \lean{relation_mem_ker}, \lean{span_relation_le_ker}, \lean{differentialPresentation}, \lean{Presentation.exteriorPower}, \lean{Solution.IsPresentation.exteriorPower}, \lean{Presentation.piTensor}; the files of the last two keep J.~Riou's copyright notice.}
+
+\begin{theorem}\label{thm:derham}
+There are $A$-linear maps $d \colon \bigwedge^n_B \Omega_{B/A} \to \bigwedge^{n+1}_B \Omega_{B/A}$, $n \ge 0$, with
+\[
+d(b_0\, db_1 \wedge \dots \wedge db_n) \;=\; db_0 \wedge db_1 \wedge \dots \wedge db_n
+\]
+and $d \circ d = 0$. The elements $b_0\,db_1\wedge\dots\wedge db_n$ span $\bigwedge^n_B \Omega_{B/A}$ over $A$.
+\end{theorem}
+
+\begin{proof}
+Restricting scalars along the presentation of Proposition~\ref{prop:presentations} gives an $A$-linear presentation of $\bigwedge^n_B \Omega_{B/A}$ with generators $b_0\, db_1 \wedge \dots \wedge db_n$. The formula is compatible with each relation; the multiplicative relation uses the Leibniz rule and antisymmetry. On generators $d \circ d = 0$ because $d(1) = 0$.
+\end{proof}
+
+\leanref{\lean{DeRhamComplex.presentationDifferentialsDown}, \lean{DeRhamComplex.d}, \lean{DeRhamComplex.d_var}, \lean{DeRhamComplex.d_d}, \lean{deRhamComplex}, \lean{riouSourceGenerator_span}.}
+
+\subsection{The divided power de Rham complex}
+
+The following is \cite[Tag~07HY]{stacks} applied as in \cite[Tag~07HZ]{stacks}.
+
+\begin{theorem}\label{thm:pd-derham}
+For every $n \ge 0$ the differential of Theorem~\ref{thm:derham} descends along $\bigwedge^n_B \Omega_{B/A} \twoheadrightarrow \Omega^n_{B,\delta}$. This gives a complex $\Omega^\bullet_{B,\delta}$ of $A$-modules with
+\[
+d(b\, dg_1 \wedge \dots \wedge dg_n) \;=\; db \wedge dg_1 \wedge \dots \wedge dg_n .
+\]
+\end{theorem}
+
+\begin{proof}
+By Lemma~\ref{lem:exterior-quotient}, the kernel of $\bigwedge^n\Omega_{B/A} \twoheadrightarrow \Omega^n_{B,\delta}$ is spanned over $A$ by the forms
+\[
+\omega \;=\; b_0\, dg_1 \wedge \dots \wedge \big(dx\dpow{r} - x\dpow{r-1}dx\big) \wedge \dots \wedge dg_n ,
+\]
+where $x \in J$ and $r \ge 1$, with the relation in one slot. The image of $d\omega$ in $\Omega^{n+1}_{B,\delta}$ is zero: in the quotient $dx\dpow{r} = x\dpow{r-1}dx$, and $dx\dpow{r-1} \wedge dx = x\dpow{r-2}\,dx \wedge dx = 0$, while $d1 = 0$ for $r = 1$.
+\end{proof}
+
+\leanref{\lean{pdTermMap_comp_d_pdRelationGenerator_eq_zero}, \lean{quotientTermMap_ker_le_pdRiouSpan}, \lean{pdQuotientRelationStable} (in \lean{DeRham/PDStabilityFull.lean}); \lean{descendLinearMap}, \lean{quotientDifferential}, \lean{quotientDifferential_comp_self}, \lean{deRhamComplexOfQuotient}; \lean{pdDeRhamComplex}, \lean{pdDeRhamComplex_d_generator}.}
+
+\begin{proposition}\label{prop:pd-derham-functorial}
+A morphism of divided power algebras $f \colon (B,\delta) \to (D,\delta')$ induces a map of complexes $\Omega^\bullet_{B,\delta} \to \Omega^\bullet_{D,\delta'}$, with $v_1 \wedge \dots \wedge v_n \mapsto f_*v_1 \wedge \dots \wedge f_*v_n$, which is $f$ in degree $0$. This is compatible with identities and composition.
+\end{proposition}
+
+\leanref{\lean{pdExteriorMap}, \texttt{pdExteriorMap\_$\iota$Multi}, \lean{pdExteriorMap_smul}, \lean{pdExteriorMap_id}, \lean{pdExteriorMap_comp}, \lean{pdExteriorMap_d_naturality}, \lean{pdDeRhamMap}, \lean{pdDeRhamMap_id}, \lean{pdDeRhamMap_comp}, \lean{zeroEquiv_comp_pdExteriorMap_zero}.}
+
+\subsection{Characteristic zero}
+
+\begin{proposition}\label{prop:char-zero}
+Assume that $A$ is a $\Q$-algebra and give $J$ the divided powers $x\dpow{n} \coloneqq x^n/n!$.
+\begin{itemize}
+\item[\normalfont{(1)}] The map $d \colon B \to \Omega_{B/A}$ is a PD derivation, and $\Omega_{B/A} \simeq \Omega_{B,\delta}$.
+\item[\normalfont{(2)}] Every map of $\Q$-algebras sending an ideal into another is a morphism of divided power algebras for these divided powers.
+\item[\normalfont{(3)}] The identity of $B$, with the divided powers $x^n/n!$ on $J + IB$, is a compatible divided power envelope of $(B, J)$.
+\end{itemize}
+\end{proposition}
+
+\leanref{\lean{isPDDerivation_kaehlerDifferential_D}, \lean{ordinaryPDKaehlerEquiv}, in the file \lean{DeRham/CharacteristicZero.lean}; \lean{ratAlgebra_isDPMorphism}, \lean{ratAlgebra_identity_isDPEnvelope}, \lean{ratAlgebra_hasDPEnvelope}, in \lean{Envelope/FreeConstruction/RatAlgebra.lean}.}
+
+%======================================================================
+\section{Homological algebra}\label{sec:homological}
+%======================================================================
+
+In this section $R$ is a ring and complexes are $\N$-graded cochain complexes of $R$-modules. The statements about bicomplexes are proved elementwise, through the following criteria.
+
+\begin{lemma}\label{lem:elementwise}
+Let $K$ and $L$ be complexes and $f \colon K \to L$ a map of complexes.
+\begin{itemize}
+\item[\normalfont{(1)}] The complex $K$ is exact in degree $n$ if and only if every cocycle of $K^n$ is a coboundary; for $n = 0$ this means $\ker(d^0) = 0$.
+\item[\normalfont{(2)}] The map $f$ is a quasi-isomorphism in degree $n$ if and only if for every cocycle $y \in L^n$ there are a cocycle $x \in K^n$ and $z \in L^{n-1}$ with $f(x) = y + dz$, and every cocycle $x \in K^n$ with $f(x)$ a coboundary is a coboundary, with the convention $L^{-1} = 0$.
+\end{itemize}
+\end{lemma}
+
+\leanref{\lean{exactAt_iff_elementwise}, \lean{quasiIsoAt_iff_elementwise}, \lean{quasiIso_of_elementwise}, in \lean{Homology/Elementwise.lean}.}
+
+\subsection{First-quadrant bicomplexes}
+
+A bicomplex $K$ is a family of $R$-modules $K^{p,q}$, $p, q \in \N$, with commuting differentials $d_h$ and $d_v$. In Lean it is a \lean{RawBi}, whose differentials are indexed like those of Mathlib's \lean{HomologicalComplex}, so that no transport along equalities of indices is needed. Its total complex has terms $\Tot(K)^n \coloneqq \prod_{p+q=n} K^{p,q}$, with differential
+\[
+(dx)_{p,q} \;=\; d_h x_{p-1,q} + (-1)^p d_v x_{p,q-1},
+\]
+and transposition with the sign $(-1)^{pq}$ is an isomorphism $\Tot(K^{\mathsf T}) \simeq \Tot(K)$ (\lean{RawBi.totComplex}, \lean{dRaw_dRaw}, \lean{transposeTotIso}, in \lean{Homology/TotM.lean}).
+
+\begin{proposition}\label{prop:acyclic-assembly}
+Let $K$ be a first-quadrant bicomplex. If every column of $K$ is exact in every degree, including degree $0$, then $\Tot(K)$ is exact in every degree. The same holds with rows in place of columns.
+\end{proposition}
+
+\begin{proof}
+By induction on $k$, every cocycle of $\Tot(K)$ is cohomologous to a cocycle vanishing in all columns $p < k$; in degree $n$ take $k = n+1$. In degree $0$ the induction uses the exactness of the columns in degree $0$, and shows that every cocycle vanishes.
+\end{proof}
+
+\leanref{\lean{exactAt_totComplex_of_columnsExact}, \lean{exactAt_totComplex_of_rowsExact}, \lean{rawAcyclic_of_columnsExact}, \lean{rawAcyclic_of_rowsExact}.}
+
+\begin{proposition}\label{prop:augmented}
+Let $K$ be a first-quadrant bicomplex, $L$ a complex and $\eta_p \colon L^p \to K^{p,0}$ maps commuting with the horizontal differentials, with $d_v \circ \eta = 0$. If for every $p$ the augmented column
+\[
+0 \longrightarrow L^p \xrightarrow{\ \eta_p\ } K^{p,0} \longrightarrow K^{p,1} \longrightarrow \cdots
+\]
+is exact, then the map $L \to \Tot(K)$ sending $y \in L^n$ to $\eta_n(y)$ in bidegree $(n,0)$ is a quasi-isomorphism. The same holds for augmented rows $0 \to L^q \to K^{0,q} \to K^{1,q} \to \cdots$.
+\end{proposition}
+
+\leanref{\texttt{augRow$\iota$\_quasiIso}, \texttt{augCol$\iota$\_quasiIso}; the second is reduced to the first by transposition.}
+
+\begin{proposition}\label{prop:totmap}
+Let $\varphi \colon K \to L$ be a map of first-quadrant bicomplexes that is a quasi-isomorphism on every column. Then $\Tot(\varphi)$ is a quasi-isomorphism.
+\end{proposition}
+
+\begin{proof}
+The columnwise mapping fibre, with terms $K^{p,q} \oplus L^{p,q-1}$, has exact columns. Its total complex is therefore acyclic by Proposition~\ref{prop:acyclic-assembly}, and it is identified, up to the sign $(-1)^p$ on the second component, with the mapping fibre of $\Tot(\varphi)$, whose acyclicity means that $\Tot(\varphi)$ is a quasi-isomorphism.
+\end{proof}
+
+\leanref{\lean{RawBi.totMap}, \lean{totMap_quasiIso}, \lean{Hom.fiber}, \lean{columnsExact_fib}, in \lean{Homology/TotQuasiIso.lean}.}
+
+\begin{proposition}\label{prop:projections}
+Let $K$ be a first-quadrant bicomplex. The projection $\Tot(K) \to K^{\bullet,0}$ onto the bottom row is a map of complexes, and it is a quasi-isomorphism if the bicomplex formed by the rows $q \ge 1$ has acyclic total complex. The same holds for the projection $\Tot(K) \to K^{0,\bullet}$ onto the first column and the columns $p \ge 1$.
+\end{proposition}
+
+\leanref{\lean{rowZeroProj}, \lean{rowZeroProj_quasiIso} (in \lean{Homology/TotProjection.lean}), \lean{colZeroProj}, \lean{colZeroProj_quasiIso}.}
+
+\subsection{The lemma of Bhatt and de Jong}
+
+Let $K_c$ be a cosimplicial object in $\N$-graded cochain complexes of $R$-modules, and let $K$ be the bicomplex with $K^{p,q} \coloneqq K_c[p]^q$, horizontal differential $\sum_i (-1)^i \delta_i$ and vertical differential the internal one. The following abstracts the double complex argument in the proof of \cite[Theorem~2.12]{bhatt-dejong}, which is also the argument of \cite[Tag~07LG]{stacks}; there it is phrased with the two spectral sequences of the double complex, here it is proved elementwise.
+
+\begin{theorem}\label{thm:bdj}
+Let $K_c$ and $K$ be as above.
+\begin{itemize}
+\item[\normalfont{(1)}] If for every $q \ge 1$ the alternating coface complex of $n \mapsto K_c[n]^q$ is exact, then the projection from $\Tot(K)$ to the alternating coface complex of $n \mapsto K_c[n]^0$ is a quasi-isomorphism.
+\item[\normalfont{(2)}] If for every $n$ the map $K_c[0] \to K_c[n]$ induced by the first vertex is a quasi-isomorphism, then the projection $\Tot(K) \to K_c[0]$ is a quasi-isomorphism.
+\end{itemize}
+\end{theorem}
+
+\begin{proof}
+Part (1) follows from Propositions~\ref{prop:projections} and~\ref{prop:acyclic-assembly}. For (2), let $K_c'$ be the constant cosimplicial object on $K_c[0]$ and compare $K_c$ with $K_c'$ through the maps induced by $[n] \twoheadrightarrow [0]$. These are quasi-isomorphisms by two-out-of-three, since composed with the first-vertex maps they give the identity. Proposition~\ref{prop:totmap} applies to the induced map of bicomplexes, and since $[0] \to [0]$ is the identity, the projection $\Tot(K) \to K_c[0]$ factors through it. For $K_c'$ the horizontal differentials are alternately $0$ and the identity, so the columns $p \ge 1$ form a bicomplex with exact rows, and Propositions~\ref{prop:acyclic-assembly} and~\ref{prop:projections} apply.
+\end{proof}
+
+\leanref{\lean{RawBi.ofCosimplicial}, \lean{rowZeroComplexIso}, \lean{colZeroComplexIso}, \lean{RawBi.bhattDeJong_row}, \lean{RawBi.bhattDeJong_column}, \lean{toConst}, \lean{toConst_app_zero}, \lean{colZeroProj_eq_totMap_comp}, in \lean{Homology/CosimplicialTot.lean}.}
+
+Only the vertex $0$ is assumed in (2). This is equivalent to the hypothesis on all vertices, since each vertex map $K_c[0] \to K_c[n]$ is a section of the map induced by $[n] \twoheadrightarrow [0]$.
+
+\subsection{Cosimplicial contractions}
+
+\begin{definition}
+Let $X$ be a cosimplicial object of a preadditive category. A \emph{cosimplicial contraction} of $X$ is a family of endomorphisms $h_n(\alpha)$ of $X[n]$, for $n \ge 0$ and $\alpha \colon [n] \to [1]$, such that $X(f) \circ h_m(\alpha \circ f) = h_n(\alpha) \circ X(f)$ for every $f \colon [m] \to [n]$, with $h_n(\mathrm{const}_0) = 0$ and $h_n(\mathrm{const}_1) = \mathrm{id}$.
+\end{definition}
+
+A cosimplicial contraction is a cosimplicial homotopy from $0$ to the identity in the sense of \cite[Tag~019U]{stacks}; the contraction of the modules of differentials of a Čech nerve is of this form \cite[Example~2.16]{bhatt-dejong}, \cite[Tag~07L9]{stacks}.
+
+\begin{theorem}\label{thm:contraction}
+Let $X$ be a cosimplicial object of a preadditive category with a cosimplicial contraction, and let $d$ be its alternating coface differential. There are maps $s_n \colon X[n+1] \to X[n]$ with
+\[
+s_0 \circ d^0 = \mathrm{id} \;\text{ and }\; d^{n} \circ s_n + s_{n+1} \circ d^{n+1} = \mathrm{id}.
+\]
+In particular, the alternating coface complex of a cosimplicial $R$-module with a cosimplicial contraction is exact in every degree, including degree $0$.
+\end{theorem}
+
+\begin{proof}
+Write $H_t \coloneqq h_{n+1}(k \mapsto [t \le k])$ for $0 \le t \le n+2$, an endomorphism of $X[n+1]$, so that $H_0 = \mathrm{id}$ and $H_{n+2} = 0$. The maps $X(\sigma_j) \circ H_{j+1} \colon X[n+1] \to X[n]$, for $0 \le j \le n$, satisfy the identities of a simplicial homotopy from $0$ to the identity on the opposite simplicial object, and Mathlib's \lean{SimplicialObject.Homotopy.toChainHomotopy} gives the chain homotopy. The displayed identities are obtained by unwinding the formulas.
+\end{proof}
+
+\leanref{\lean{CosimplicialContraction}, \lean{homotopyComponent}, \lean{CosimplicialContraction.toSimplicialHomotopy}, \lean{contr}, \lean{objD_zero_comp_contr}, \lean{contr_comp_objD_add}, \lean{CosimplicialContraction.exactAt}, in \lean{Homology/CosimplicialContraction.lean}.}
+
+\subsection{Injectives and limits in large functor categories}
+
+The category $\INF(C/A)$ is not small in Mathlib's sense, since its objects live in a larger universe than its morphisms. The injective resolutions and limits needed for derived global sections are therefore constructed directly.
+
+\begin{theorem}\label{thm:enough-injectives}
+Let $\mathcal J$ be a category with objects in \lean{Type (v+1)} and morphisms in \lean{Type v}, and let $R$ be a commutative ring that is \lean{Small.{v+1}}.
+\begin{itemize}
+\item[\normalfont{(1)}] For an object $Z$ of $\mathcal J$ and an injective $R$-module $M$, the diagram $\Coind_Z(M) \colon Y \mapsto \Map(\Hom(Y, Z), M)$ is an injective object of the category of functors $\mathcal J \to \Mod_R$.
+\item[\normalfont{(2)}] Every functor $F \colon \mathcal J \to \Mod_R$ embeds into $\prod_Z \Coind_Z(M_Z)$, where $F(Z) \hookrightarrow M_Z$ are chosen embeddings into injective modules. Hence the category of functors $\mathcal J \to \Mod_R$ has enough injectives.
+\item[\normalfont{(3)}] The category \lean{ModuleCat.{v+1} R} has limits of shape $\mathcal J$, computed by compatible families, and the limit functor is additive.
+\end{itemize}
+\end{theorem}
+
+\leanref{\lean{coinduced}, \lean{injective_coinduced}, \lean{coinducedInjectiveEmbedding}, \lean{hasEnoughInjectivesFunctorCategory}, \lean{compatibleFamilyLimitCone}, \lean{hasLimitsOfShapeLargeModuleCat}, \lean{limModuleCatAdditive}, in \lean{Cohomology/FunctorCategoryInjectives.lean}.}
+
+\begin{proposition}\label{prop:precomposition}
+Let $\ell \colon \mathcal C \to \mathcal D$ be a functor with a right adjoint $r$, and let $\mathcal E$ be a category with pullbacks. Then precomposition with $\ell$ sends injective objects of the category of functors $\mathcal D \to \mathcal E$ to injective objects of the category of functors $\mathcal C \to \mathcal E$.
+\end{proposition}
+
+\begin{proof}
+Precomposition with $\ell$ is right adjoint to precomposition with $r$, and the latter preserves monomorphisms because they are detected objectwise.
+\end{proof}
+
+\leanref{\lean{precompositionAdjunction}, \lean{injective_whiskeringLeft_obj_of_adjunction}.}
+
+\subsection{Derived functors and derived limits}
+
+\begin{proposition}\label{prop:grothendieck}
+Let $\mathcal A$, $\mathcal B$ and $\mathcal C$ be abelian categories with enough injectives, and $f \colon \mathcal A \to \mathcal B$ and $g, g' \colon \mathcal B \to \mathcal C$ additive functors.
+\begin{itemize}
+\item[\normalfont{(1)}] An isomorphism $g \simeq g'$ induces an isomorphism of right derived functors to the homotopy category.
+\item[\normalfont{(2)}] If $f$ is exact and preserves injective objects, then $f$ sends injective resolutions to injective resolutions, and $R(g \circ f)(X) \simeq Rg(f(X))$ for every object $X$ of $\mathcal A$.
+\end{itemize}
+\end{proposition}
+
+\leanref{\lean{additiveDerivedIso}, \lean{mapInjectiveResolution}, \lean{rightDerivedToHomotopyCategoryCompIso}, in \lean{Ocris/Cohomology.lean}.}
+
+\begin{theorem}\label{thm:derived-left-adjoint}
+Let $\ell \colon \mathcal J \to \mathcal P$ be a functor with a right adjoint between categories as in Theorem~\ref{thm:enough-injectives}, and let $G$ be a functor $\mathcal P \to \Mod_R$. Then there is an isomorphism in the homotopy category
+\[
+R\lim_{\mathcal P}(G) \;\simeq\; R\lim_{\mathcal J}(G \circ \ell).
+\]
+\end{theorem}
+
+\begin{proof}
+The functor $\ell$ is initial, so $\lim_{\mathcal J} (- \circ \ell) \simeq \lim_{\mathcal P}$. Restriction along $\ell$ is exact and preserves injective objects by Proposition~\ref{prop:precomposition}. Proposition~\ref{prop:grothendieck} concludes.
+\end{proof}
+
+\leanref{\lean{derivedLimitIsoOfAdjunction}, in \lean{Ocris/Filtration.lean}.}
+
+\spa
+
+Finally, \lean{QuasiIsoEquiv}, in \lean{Ocris/DeRhamComparison.lean}, is the equivalence relation on complexes generated by quasi-isomorphisms, an inductive proposition with constructors \lean{ofHom}, \lean{symm} and \lean{trans}. Equivalent complexes have isomorphic cohomology in every degree (\lean{QuasiIsoEquiv.nonempty_homology_iso}). It replaces an isomorphism in the derived category in the statements below.
+
+%======================================================================
+\section{Computing cohomology on \texorpdfstring{$\INF_e$}{INF\_e}}\label{sec:level}
+%======================================================================
+
+By Theorem~\ref{thm:adjunction-derived} it suffices to compute derived limits on the single site $\INF_e$ of the Basic Setting. There the argument of \cite[Tag~07JM]{stacks} for a category with a weakly final object and products of pairs applies; we formalised it in the following abstract form.
+
+\subsection{An abstract Čech computation of derived limits}
+
+\begin{definition}\label{def:cech-data}
+\emph{Čech nerve data} on a category $\mathcal J$ consist of a cosimplicial object $X$ of $\mathcal J$, nonempty sets $S(Z)$ for the objects $Z$ of $\mathcal J$, and bijections
+\[
+\Hom_{\mathcal{J}}(X[n], Z) \;\simeq\; S(Z)^{n+1}
+\]
+natural in $[n]$. For a functor $G \colon \mathcal J \to \Mod_R$, the \emph{Čech complex} $\check C^\bullet(G)$ is the alternating coface complex of $n \mapsto G(X[n])$, and $\check H^n(G) \coloneqq H^n(\check C^\bullet(G))$.
+\end{definition}
+
+\leanref{\lean{CechNerveData} with \lean{equiv_map}, and \lean{cech D G}, in \lean{Cohomology/Cech.lean}. Naturality in $Z$ is not required.}
+
+\begin{proposition}\label{prop:cech-degree-zero}
+Let $G \colon \mathcal J \to \Mod_R$ be a functor. The augmentation $\lim(G) \hookrightarrow G(X[0])$ is injective with image $\ker(d^0)$. In particular $\lim(G) \simeq \check H^0(G)$.
+\end{proposition}
+
+\begin{proof}
+Given two maps $g, g' \colon X[0] \to Z$, the bijections provide $h \colon X[1] \to Z$ whose two faces are $g$ and $g'$. Hence a cocycle in $G(X[0])$ has the same image under all maps out of $X[0]$, and defines a compatible family. The augmentation is injective because every object $Z$ receives a map from $X[0]$, the set $S(Z)$ being nonempty.
+\end{proof}
+
+\leanref{\lean{CechNerveData.exists_pair}, \lean{augment_injective}, \lean{exists_limit_of_cocycle}, \lean{augment_comp_d}, \lean{cocycle_map_eq}, \lean{limitIso} (limits as compatible families).}
+
+\begin{proposition}\label{prop:cech-injective}
+If $G$ is an injective object of the category of functors $\mathcal J \to \Mod_R$, then $\check C^\bullet(G)$ is exact in every positive degree.
+\end{proposition}
+
+\begin{proof}
+Consider the functor
+\[
+\mathrm{big}(G) \colon Y \longmapsto \prod_{Z} \Map\big(\Hom_{\mathcal{J}}(Y, Z),\, G(Z)\big)
+\]
+with the monomorphism $G \hookrightarrow \mathrm{big}(G)$ sending $a \in G(Y)$ to $(g \mapsto G(g)(a))_Z$. The Čech complex of $\mathrm{big}(G)$ has an explicit contraction in positive degrees, obtained by prepending a chosen element of $S(Z)$. Since $G$ is injective the monomorphism has a retraction, so exactness transfers to $G$.
+\end{proof}
+
+\leanref{\lean{bigCoinduced}, \lean{toBig}, \lean{mono_toBig}, \lean{bigContraction}, \lean{big_cocycle_eq}, \lean{bigRetraction}, \lean{exists_cech_d_eq_of_injective}.}
+
+\begin{theorem}\label{thm:cech-zigzag}
+Let $\mathcal J$ be equipped with Čech nerve data, with objects in \lean{Type (v+1)} and morphisms in \lean{Type v}, let $R$ be a commutative ring, let $F \colon \mathcal J \to \Mod_R$ be a functor and $F \to I^\bullet$ an injective resolution. There is a zigzag of quasi-isomorphisms
+\[
+\lim(I^\bullet) \longrightarrow \Tot\big(I^q(X[n])\big) \longleftarrow \check{C}^\bullet(F).
+\]
+\end{theorem}
+
+\begin{proof}
+The bicomplex $I^q(X[n])$ has two augmentations. The augmented rows $\lim(I^q) \to I^q(X[0]) \to I^q(X[1]) \to \cdots$ are exact by Propositions~\ref{prop:cech-degree-zero} and~\ref{prop:cech-injective}. The augmented columns $F(X[n]) \to I^0(X[n]) \to I^1(X[n]) \to \cdots$ are exact because a resolution in a functor category is exact objectwise. Proposition~\ref{prop:augmented} makes both augmentations quasi-isomorphisms.
+\end{proof}
+
+\leanref{\lean{cechBicomplex}, \lean{limAug}, \lean{limAug_rowsExact}, \lean{resAug}, \lean{resAug_columnsExact}, \lean{res_exact_zero}, \lean{res_exact_succ}, \lean{res_mono}, \lean{cechZigzag}.}
+
+Combined with Mathlib's computation of right derived functors by injective resolutions, this gives the following statement.
+
+\begin{theorem}\label{thm:cech-derived}
+Let $\mathcal J$ be a category with objects in \lean{Type (v+1)} and morphisms in \lean{Type v}, equipped with Čech nerve data, and let $R$ be a commutative ring that is \lean{Small.{v+1}}. For every functor $F \colon \mathcal J \to \Mod_R$ and every $n \ge 0$,
+\[
+R^n \lim(F) \;\simeq\; \check H^n(F).
+\]
+In particular $\lim(F) \simeq \check H^0(F)$, and injective functors have vanishing Čech cohomology in positive degrees.
+\end{theorem}
+
+\leanref{\lean{Cohomology.Cech.rightDerivedLimIsoCech}, \lean{limIsoCechHomologyZero}, \lean{cech_homology_isZero_of_injective}, \lean{Zigzag.homologyIso}, \lean{limComplexHomologyIsoCech}, in \lean{Cohomology/CechDerived.lean}.}
+
+\subsection{The Čech--Alexander complex}
+
+On $\INF_e$, the Čech nerve data consist of the cosimplicial object $X_e(\bullet)$, the sets of sections $S(Z)$, and the bijections of Proposition~\ref{prop:cech-hom} (\lean{Level.cechNerveData}). Applied to $\Ocris$ they give the Čech complex $D(\bullet)$ (\lean{ocrisCechComplex}) and the zigzag of Theorem~\ref{thm:cech-zigzag} (\lean{ocrisCechZigzag}).
+
+\begin{theorem}\label{thm:cech-alexander}
+Assume the Basic Setting and let $E$ be an envelope family. For every $n \ge 0$ there are isomorphisms of $A$-modules
+\[
+H^n\big(R\Gamma(\INF(C/A), \Ocris)\big) \;\simeq\; R^n\lim{}_{\INF_e}(\Ocris) \;\simeq\; H^n\big(D(0) \to D(1) \to D(2) \to \cdots\big).
+\]
+In particular the cohomology of the complex $D(\bullet)$ does not depend on the choice of $e$ with $(p^e)! = 0$ in $A$.
+\end{theorem}
+
+\begin{proof}
+The first isomorphism is Theorem~\ref{thm:adjunction-derived}, and the second is Theorem~\ref{thm:cech-derived} for the Čech nerve data on $\INF_e$.
+\end{proof}
+
+\leanref{\lean{EnvelopeFamily.crystallineCohomologyIsoCechAlexander}, \lean{levelRightDerivedIsoCechAlexander}, \lean{cechAlexander_homology_independent}, in \lean{Ocris/CechAlexander.lean}; \lean{InfinitesimalSite.crystallineCohomologyIsoCechAlexander}, for \lean{envelopeFamily}, in \lean{MainTheorems.lean}; also \lean{ocrisDerivedGlobalSectionsIsoLimComplex}, \lean{levelOcrisDerivedGlobalSectionsIsoLimComplex}. The statements in \lean{Ocris/CechAlexander.lean} are proved on \lean{Level A C m} for every $m > 0$ with $m! = 0$ in $A$, and \lean{cechAlexander_homology_independent} compares two such exponents.}
+
+The terms $D(n)$ are envelopes of the polynomial presentations $P_n \twoheadrightarrow C$ by Proposition~\ref{prop:cech-envelope}. Theorem~\ref{thm:cech-alexander} needs neither the Poincaré lemma nor the vanishing lemma of the next section.
+
+%======================================================================
+\section{The de Rham comparison}\label{sec:derham}
+%======================================================================
+
+We keep the notation of the previous section: we assume the Basic Setting, and $D(n) = \Ocris(X_e(n))$.
+
+\subsection{The bicomplex}
+
+The assignment $n \mapsto \Omega^\bullet_{D(n)}$ is a cosimplicial object in cochain complexes of $A$-modules (\lean{levelCechDeRham}). Let $K$ be the associated bicomplex, with $K^{n,q} \coloneqq \Omega^q_{D(n)}$, horizontal differential $d_h = \sum_{i=0}^{n+1} (-1)^i \, \delta_i^*$ and vertical differential $d_v = d$, in Lean \lean{RawBi.ofCosimplicial}. The comparison runs through the chain
+\begin{equation}\label{eq:chain}
+\lim(I^\bullet) \longrightarrow \Tot\big(I^q(X_e(n))\big) \longleftarrow \check{C}^\bullet(\Ocris) \;\simeq\; \Omega^0_{D(\bullet)} \;\longleftarrow\; \Tot(K) \;\longrightarrow\; \Omega^\bullet_{D(0)} ,
+\end{equation}
+where $\Ocris|_{\INF_e} \to I^\bullet$ is an injective resolution in the category of functors on $\INF_e$. The first two arrows are Theorem~\ref{thm:cech-zigzag}, the isomorphism identifies $0$-forms with functions (\lean{levelDeRhamZeroIso}, \lean{rowZeroComplexIso}), and the last two arrows are the projections of Theorem~\ref{thm:bdj}. The theorem \lean{affineDeRhamComparison_of_quasiIso_of_exact} assembles \eqref{eq:chain} from the hypotheses of the two parts of Theorem~\ref{thm:bdj}, called \lean{PositiveCechExact} and \lean{FirstVertexQuasiIso}. The rest of the section proves both.
+
+\subsection{Presented envelopes}
+
+To construct operators on $\Omega_{D(n)}$ we use only the universal property.
+
+\begin{definition}
+Let $\sigma$ be a set and $J \subseteq A[x_s : s \in \sigma]$ an ideal. A \emph{presented envelope} of $J$ is an $A$-algebra map $\iota \colon A[x_s : s \in \sigma] \to D$ together with divided powers $\delta$ on an ideal $K \supseteq JD + ID$, compatible with $\gamma$, such that $\iota$ is initial among maps to compatible divided power algebras sending $J$ into the divided power ideal. Put $dx_s \coloneqq d(\iota(x_s))$.
+\end{definition}
+
+\begin{proposition}\label{prop:presented}
+Let $(\iota, D, \delta)$ be a presented envelope of $J$.
+\begin{itemize}
+\item[\normalfont{(1)}] Morphisms of divided power algebras and PD derivations out of $D$ are determined by their values on the elements $\iota(x_s)$.
+\item[\normalfont{(2)}] The $D$-module $\Omega_{D,\delta}$ is generated by the $dx_s$. Hence $D$-linear maps out of $\Omega_{D,\delta}$ are determined by their values on the $dx_s$.
+\item[\normalfont{(3)}] An $A$-subalgebra $D' \subseteq D$ containing every $\iota(x_s)$ and such that $\delta_n(y) \in D'$ for all $y \in D' \cap K$ and $n \ge 1$ is equal to $D$.
+\item[\normalfont{(4)}] An $A$-algebra map $\varphi \colon A[x_s] \to A[x_{s'}]$ with $\varphi(J) \subseteq J'$ induces a morphism of divided power algebras between presented envelopes of $J$ and $J'$.
+\item[\normalfont{(5)}] For every family $(m_s)$ of elements of a $D$-module there is a unique PD derivation $\theta$ of $D$ with $\theta(\iota(x_s)) = m_s$.
+\end{itemize}
+\end{proposition}
+
+\begin{proof}
+Part (1) follows from initiality and Theorem~\ref{thm:derivation-extension}. For (2), the composite of $d$ with the projection to $\Omega_{D,\delta}/\langle dx_s\rangle$ is a PD derivation vanishing on the $\iota(x_s)$, hence zero by (1). For (3), the divided powers restrict to $D'$, initiality gives $\psi \colon D \to D'$, and the inclusion composed with $\psi$ is the identity by (1). Parts (4) and (5) follow from initiality and Theorem~\ref{thm:derivation-extension}.
+\end{proof}
+
+\leanref{\lean{IsPresentedEnvelope}, \lean{PresentedEnvelope.hom_ext}, \lean{PresentedEnvelope.pdDerivation_ext}, \lean{span_dx}, \lean{hom_ext_dx}, \lean{PresentedEnvelope.eq_top}, \lean{DividedPowers.restrictSubalgebra}, \lean{PresentedEnvelope.lift}, \lean{lift_X}, \lean{PresentedEnvelope.extendDer}, \lean{extendDer_spec}, in \lean{Ocris/PresentedEnvelope.lean} and \lean{Ocris/PresentedEnvelopeTools.lean}; \lean{cech_isPresentedEnvelope} in \lean{Ocris/CechVanishing.lean}.}
+
+\subsection{The vanishing lemma}
+
+The following is \cite[Tag~07LA]{stacks}; its proof here uses no freeness of $\Omega_{D(n)}$.
+
+\begin{proposition}\label{prop:vanishing}
+For every $q \ge 1$, the alternating coface complex of $n \mapsto \Omega^q_{D(n)}$ is exact.
+\end{proposition}
+
+\begin{proof}
+By Proposition~\ref{prop:presented}(2) and~(5), for every predicate $S$ on a set of variables there is a unique $D$-linear map $\partial_S \colon \Omega_{D,\delta} \to \Omega_{D,\delta}$ with
+\[
+\partial_S(dx_s) \;=\; \begin{cases} dx_s & \text{if } S(s), \\ 0 & \text{otherwise.} \end{cases}
+\]
+If a morphism of presented envelopes $g$ sends $\iota(x_s)$ to $\iota'(x_{r(s)})$, then $g_* \circ \partial_{S' \circ r} = \partial'_{S'} \circ g_*$, and the same holds for exterior powers. For $\alpha \colon [n] \to [1]$ let $S_\alpha(i,c)$ be the predicate $\alpha(i) = 1$ on the variables of $P_n$, and put
+\[
+h_n(\alpha) \;\coloneqq\; \textstyle\bigwedge^{q} \partial_{S_\alpha} \colon \Omega^{q}_{D(n)} \longrightarrow \Omega^{q}_{D(n)} .
+\]
+This is natural in $([n], \alpha)$, $h_n(\mathrm{const}_1) = \mathrm{id}$, and $h_n(\mathrm{const}_0) = 0$ because $q \ge 1$. Theorem~\ref{thm:contraction} applies.
+\end{proof}
+
+\leanref{\lean{partialOp}, \lean{partialOp_dx}, \lean{partialOp_of_forall}, \lean{partialOp_of_forall_not}, \lean{partialExt}, \lean{partialExt_natural}, \lean{cech_comparison_X}, \lean{cechContraction}, \lean{positiveCechExact}, in \lean{Ocris/PresentedEnvelope.lean} and \lean{Ocris/CechVanishing.lean}.}
+
+\subsection{The one-variable Poincaré lemma}
+
+\begin{definition}
+Let $(B, J, \delta)$ be a divided power algebra. A \emph{one-variable structure} on $B$ consists of an idempotent morphism of divided power algebras $\varepsilon \colon B \to B$, an element $\xi \in J$ with $\varepsilon(\xi) = 0$, and a PD derivation $\partial \colon B \to B$ with $\partial(\xi) = 1$ and $\partial \circ \varepsilon = 0$, such that every $y \in B$ is a finite sum $\sum_k \xi\dpow{k}\, \varepsilon(c_k)$ with $c_k \in B$.
+\end{definition}
+
+This models $B = B_0\langle \xi \rangle$ with $B_0 \coloneqq \varepsilon(B)$, without asserting that the divided powers of $\xi$ form a basis. The following generalises the one-variable case of \cite[Tag~07LD]{stacks}; its proof follows \cite[Tags~07Q7, 07Q8]{stacks}.
+
+\begin{theorem}\label{thm:one-variable}
+Let $(\varepsilon, \xi, \partial)$ be a one-variable structure on $(B, J, \delta)$ and let $\varepsilon^*$ be the induced endomorphism of $\Omega^\bullet_{B,\delta}$. If $\omega \in \Omega^0_{B,\delta}$ is a cocycle, then $\omega = \varepsilon^*\omega$. If $\omega \in \Omega^{m+1}_{B,\delta}$ is a cocycle, then $\omega - \varepsilon^*\omega = d\eta$ for some $\eta \in \Omega^m_{B,\delta}$.
+\end{theorem}
+
+\begin{proof}
+For a $1$-form $v$ write $v \wedge -$ for the wedge product, and for a $B$-linear form $\phi$ on $\Omega_{B,\delta}$ let $\iota_\phi$ be the interior product, defined through Mathlib's \lean{CliffordAlgebra.contractLeft} for the zero quadratic form. They satisfy $v \wedge v \wedge x = 0$ and
+\[
+\iota_\phi(v \wedge x) \;=\; \phi(v)\,x - v \wedge \iota_\phi x,
+\]
+as well as the Leibniz rule $d(fx) = df \wedge x + f\,dx$.
+Let $\iota_\partial$ be the interior product with the form induced by $\partial$ (Proposition~\ref{prop:pd-kaehler}). One checks that $\xi\dpow{a}\,\xi\dpow{b} = \tbinom{a+b}{a}\,\xi\dpow{a+b}$, that $\varepsilon(\xi\dpow{k}) = \delta_{k0}$ and that $d\xi\dpow{k+1} = \xi\dpow{k}\, d\xi$, and moreover that $(\varepsilon^*)^2 = \varepsilon^*$, $d\varepsilon^* = \varepsilon^* d$ and $\iota_\partial \circ \varepsilon^* = 0$.
+
+\spa
+
+By the Taylor property, write $\omega = \sum_k \xi\dpow{k} (\alpha_k + d\xi \wedge \beta_k)$ with $\alpha_k$ and $\beta_k$ in the image of $\varepsilon^*$. Replacing $\omega$ by $\omega - d\big(\sum_k \xi\dpow{k+1} \beta_k\big)$, one may assume $\omega = \sum_k \xi\dpow{k} \rho_k$ with $\rho_k$ in the image of $\varepsilon^*$. The coefficients are recovered as
+\[
+\rho_a \;=\; \varepsilon^*\Big( (\iota_\partial \circ d)^a\, \omega \Big),
+\]
+and since $d\omega = 0$ every $\rho_a$ with $a \ge 1$ vanishes. Hence the modified form is equal to $\rho_0$, which is fixed by $\varepsilon^*$. Since $\varepsilon^*$ commutes with $d$, the original form satisfies $\omega - \varepsilon^*\omega = d\eta$ with $\eta \coloneqq \sum_k \xi\dpow{k+1} \beta_k$, since $\varepsilon^*\eta = 0$; in degree $0$ there is no $\beta_k$ and $\omega = \varepsilon^*\omega$.
+\end{proof}
+
+\leanref{\lean{OneVariable}, \lean{OneVariable.cocycle_zero}, \lean{OneVariable.cocycle_succ}, \lean{OneVariable.isBd_sub}, \lean{exists_repr}, \lean{extract}, \lean{cocycle_pure}, \lean{OneVariable.dd_dd} (in \lean{DeRham/OneVariablePoincare.lean}); \lean{wdg}, \lean{wdg_wdg_self}, \lean{ctr}, \lean{ctr_wdg_succ}, \lean{dd_smul} (in \lean{DeRham/FormCalculus.lean}).}
+
+\subsection{The relative Poincaré lemma}
+
+The following is the case of \cite[Tag~07LD]{stacks} needed here.
+
+\begin{proposition}\label{prop:poincare}
+For every $n \ge 0$, the map $\Omega^\bullet_{D(0)} \to \Omega^\bullet_{D(n)}$ induced by the first vertex is a quasi-isomorphism.
+\end{proposition}
+
+\begin{proof}
+The retraction $[n] \twoheadrightarrow [0]$ gives a left inverse, so the map is injective on cohomology. For surjectivity it suffices to show that every cocycle $\omega$ of $\Omega^\bullet_{D(n)}$ is cohomologous to $\varepsilon_{\mathrm{all}}^* \omega$, where $\varepsilon_{\mathrm{all}}$ is the endomorphism of $D(n)$ induced by $x_{i,c} \mapsto x_{0,c}$.
+
+\spa
+
+Let $t = (i,c)$ be a variable with $i \ne 0$. Let $\varepsilon_t$ be the endomorphism of $D(n)$ induced by $x_t \mapsto x_{0,c}$ and fixing the other variables (Proposition~\ref{prop:presented}(4)), put $\xi_t \coloneqq x_t - x_{0,c}$, and let $\partial_t$ be the PD derivation with $\partial_t(x_s) = [s = t]$ (Proposition~\ref{prop:presented}(5)). The identities $\partial_t \circ \varepsilon_t = 0$ and $\varepsilon_t^2 = \varepsilon_t$ follow from Proposition~\ref{prop:presented}(1). The set of finite sums $\sum_k \xi_t\dpow{k}\varepsilon_t(c_k)$ is an $A$-subalgebra containing all variables and stable under divided powers, so by Proposition~\ref{prop:presented}(3) it is $D(n)$. Thus $(\varepsilon_t, \xi_t, \partial_t)$ is a one-variable structure.
+
+\spa
+
+For a set $S$ of variables let $\varepsilon_S$ be the endomorphism of $D(n)$ induced by $x_{i,c} \mapsto x_{0,c}$ for $(i,c) \in S$ and fixing the other variables; thus $\varepsilon_{\mathrm{all}} = \varepsilon_S$ for $S$ the set of all variables, and $\varepsilon_{S \cup S'} = \varepsilon_S \circ \varepsilon_{S'}$. The variables are indexed by $[n] \times C$, which is infinite when $C$ is. Every form $\omega$ has a finite set $F$ of variables such that $\varepsilon_{S}^*\omega = \omega$ whenever $S$ is disjoint from a finite set containing $F$; this is proved by induction on $\omega$, using Proposition~\ref{prop:presented}(3) for the elements of $D(n)$. Hence $\varepsilon_{\mathrm{all}}^*\omega = \varepsilon_F^*\omega$. By induction on $F$, composing the homotopies of Theorem~\ref{thm:one-variable} for the variables $t \in F$, the form $\omega - \varepsilon_F^*\omega$ is a coboundary when $\omega$ is a cocycle.
+\end{proof}
+
+\leanref{\lean{oneVariable}, \lean{taylorSubalgebra_εS_eq_top}, \lean{exists_support}, \lean{exists_support_form}, \lean{isBd_sub_finset}, \lean{isBd_sub_all}, \lean{comparison_const_eq_εS}, \lean{firstVertexQuasiIso}, in \lean{Ocris/CechPoincare.lean}; \lean{taylorSubalgebra}, \lean{taylorSubalgebra_dpow_mem} in \lean{DeRham/OneVariablePoincare.lean}.}
+
+\begin{remark}
+Neither Proposition~\ref{prop:vanishing} nor Proposition~\ref{prop:poincare} uses a divided power polynomial algebra, nor freeness of $D(n)$ over $D(0)$ or of $\Omega_{D(n)}$. The only access to $D(n)$ is its universal property, through Proposition~\ref{prop:presented}.
+\end{remark}
+
+\subsection{The main theorem}
+
+\begin{theorem}\label{thm:main}
+Assume the Basic Setting and let $E$ be an envelope family. Let $\Ocris|_{\INF_e} \to I^\bullet$ be an injective resolution in the category of functors on $\INF_e$. The complex $\lim(I^\bullet)$, which computes $R\Gamma(\INF(C/A), \Ocris)$ by Theorem~\ref{thm:adjunction-derived}, is connected to $\Omega^\bullet_{D(0)}$ by a zigzag of quasi-isomorphisms, and for every $k \ge 0$ there is an isomorphism of $A$-modules
+\[
+H^k\big(R\Gamma(\INF(C/A), \Ocris)\big) \;\simeq\; H^k\big(\Omega^\bullet_{D(0)}\big).
+\]
+\end{theorem}
+
+\begin{proof}
+Apply \lean{affineDeRhamComparison_of_quasiIso_of_exact} to the chain \eqref{eq:chain}, with Proposition~\ref{prop:vanishing} for Theorem~\ref{thm:bdj}(1) and Proposition~\ref{prop:poincare} for Theorem~\ref{thm:bdj}(2), and then Theorem~\ref{thm:adjunction-derived}.
+\end{proof}
+
+By Proposition~\ref{prop:cech-envelope}, $D(0)$ is a compatible divided power envelope of $A[x_c : c \in C] \twoheadrightarrow C$, so the right-hand side does not depend, up to isomorphism, on the choice of $e$ with $(p^e)! = 0$ in $A$. In Lean the theorem is \lean{EnvelopeFamily.crystallineCohomologyIsoDeRham}, in \lean{Ocris/CechPoincare.lean}, for an arbitrary envelope family \lean{E} and an arbitrary exponent \lean{n} with $n! = 0$ in $A$:
+
+\begin{lstlisting}
+variable (E : EnvelopeFamily (A := A) (C := C) ($\gamma$ := $\gamma$))
+variable (p : $\mathbb{N}$) [Fact p.Prime] [IsCrystallineBase p A I]
+  (hIC : I.map (algebraMap A C) = $\bot$)
+variable (n : $\mathbb{N}$) [NeZero n] (hn : ((Nat.factorial n : $\mathbb{N}$) : A) = 0)
+
+include p hIC hn in
+theorem crystallineCohomologyIsoDeRham (k : $\mathbb{N}$) :
+    Nonempty (((HomotopyCategory.homologyFunctor (ModuleCat.{u + 1} A)
+        (ComplexShape.up $\mathbb{N}$) k).obj
+        (ocrisDerivedGlobalSections E)) $\cong$
+      ((ocrisDeRhamComplex E).obj (Level.cechObj n 0).obj).homology k)
+\end{lstlisting}
+
+Here \lean{n} is the exponent of the thickenings, not a Čech degree, and Theorem~\ref{thm:main} is the case $n = p^e$, with \lean{Level.cechObj (p ^ e) 0} the object $X_e(0)$. The complex-level form is \lean{affineDeRhamComparison}, which asserts \lean{QuasiIsoEquiv} between \lean{Cohomology.Cech.limComplex} of the injective resolution of \lean{E.levelOcrisModule p hIC n} and $\Omega^\bullet_{D(0)}$. Combining Theorems~\ref{thm:main} and~\ref{thm:cech-alexander}, the complexes $D(\bullet)$ and $\Omega^\bullet_{D(0)}$ have isomorphic cohomology. The file \lean{MainTheorems.lean} states the three theorems, under the same names in the namespace \lean{InfinitesimalSite}, for the envelope family \lean{envelopeFamily} given by Theorem~\ref{thm:envelope-existence}, so that they take no envelope family as input, on the Frobenius level \lean{Level A C (p ^ e)} and under the hypothesis \texttt{he : ((Nat.factorial (p \textasciicircum{} e) : $\mathbb{N}$) : A) = 0}.
+
+%======================================================================
+\section{How the formalisation was produced}\label{sec:produced}
+%======================================================================
+
+We used Claude, an AI system developed by Anthropic, to autoformalise the proof, following the Stacks Project \cite{stacks}, chapter \emph{Crystalline Cohomology}, and the double complex lemma of Bhatt and de Jong \cite{bhatt-dejong}. The mathematical design is due to the author: the use of the site of infinitesimal thickenings whose kernel has a uniform nilpotence exponent, in place of a site whose objects carry divided powers, and the strategy of the proof. The Lean code of the library, except two files on presentations of modules due to J.~Riou (Table~\ref{tab:infra}), was written by Claude and checked by the Lean compiler; it builds on Mathlib \cite{mathlib}. The text of this article was also drafted with Claude, from the formalisation and under the author's direction.
+
+\spa
+
+The formalisation follows four principles. The site is presentation-free: polynomial presentations appear in theorems about the site, never in the definition of the site or of $\Ocris$. Divided power envelopes are used only through their universal property \lean{IsDPEnvelope}. No data is left unproved: a \lean{Type} or an instance that statements quantify over is never defined by \texttt{sorry}. Finally, $p$ is nilpotent and no $p$-adic completion appears. In particular, the proofs of Propositions~\ref{prop:vanishing} and~\ref{prop:poincare} use only the universal property of envelopes, and no freeness statement.
+
+\subsection{Components of the library}
+
+Table~\ref{tab:infra} lists the main components and their sources.
+
+\begin{table}[ht]
+\centering
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{0.33\linewidth} >{\raggedright\arraybackslash}p{0.2\linewidth}@{}}
+\toprule
+Component & Where & Source \\
+\midrule
+Divided powers and their morphisms, \lean{DividedPowers}, \lean{IsDPMorphism} & \lean{Mathlib.RingTheory.DividedPowers} & Mathlib, by Chambert-Loir and de Frutos-Fernández \cite{cl-df} \\
+Divided power algebra, \lean{DividedPowerAlgebra} & \lean{Mathlib.RingTheory.DividedPowerAlgebra} & Mathlib, by Chambert-Loir and de Frutos-Fernández \cite{cl-df-laws} \\
+Exterior algebra, \lean{CliffordAlgebra.contractLeft}, alternating coface complexes, \lean{SimplicialObject.Homotopy.toChainHomotopy}, derived functors & Mathlib & Mathlib \cite{mathlib} \\
+Presentations of exterior powers and tensor products & \lean{DeRham/Presentation/ExteriorPowerExplicit.lean}, \lean{DeRham/Presentation/PiTensor.lean} & J.~Riou \\
+The infinitesimal sites $\INF(C/A)$ and $\INF_e$, the truncation adjunction, coproducts, Čech nerves & \lean{InfinitesimalSite/} & This formalisation \\
+Envelopes: universal property, choices, functoriality, invariance under truncation & \lean{PDDifferentials.lean}, \lean{InfinitesimalSite/Envelope.lean}, \lean{Envelope/}, \lean{Ocris/Filtration.lean} & This formalisation \\
+Existence of divided power envelopes & \lean{Envelope/Construction.lean} & This formalisation, following \cite[Tag~07H8]{stacks} \\
+Divided power algebras and Roby monomials, towards an explicit construction of envelopes & \lean{Envelope/FreeConstruction/}, \lean{InfinitesimalSite/EnvelopeConstruction.lean} & This formalisation \\
+Divided power differentials and de Rham complexes & \lean{PDDifferentials.lean}, \lean{PDDifferentials/}, \lean{DeRham/} & This formalisation, following Riou's approach \\
+$\Ocris$, derived global sections, Čech--Alexander and de Rham comparisons & \lean{Ocris.lean}, \lean{Ocris/} & This formalisation \\
+Bicomplexes, Bhatt--de Jong lemma, cosimplicial contractions, Čech computation of derived limits, injectives in functor categories & \lean{Homology/}, \lean{Cohomology/} & This formalisation \\
+\bottomrule
+\end{tabularx}
+\caption{Components of the library and their sources.}
+\label{tab:infra}
+\end{table}
+
+\subsection{Verification}
+
+The library consists of 83 Lean files and about 23000 lines. It builds with \lean{lake build} and contains no \texttt{sorry}; it follows the Mathlib naming conventions and builds without warnings under Mathlib's standard set of style linters. The command \lean{#print axioms} for \lean{crystallineCohomologyIsoDeRham}, \lean{affineDeRhamComparison} and \lean{crystallineCohomologyIsoCechAlexander}, both for an arbitrary envelope family and for \lean{envelopeFamily}, and for \lean{hasDPEnvelope}, lists only \lean{propext}, \lean{Classical.choice} and \lean{Quot.sound}. The continuous integration of the repository checks the build, the absence of \texttt{sorry} and these axioms on every change, with \lean{scripts/CheckAxioms.lean}.
+
+%======================================================================
+\section{Scope and what remains}\label{sec:scope}
+%======================================================================
+
+Theorem~\ref{thm:main} is an affine statement with trivial coefficients. In this section we explain what its hypotheses restrict and what remains to be done.
+
+\subsection{What the hypotheses mean}
+
+Since $p$ is nilpotent in $A$, no $p$-adic completion and no limit over powers of $p$ appears. The hypothesis $(p^e)! = 0$ in $A$ is a quantitative form of this nilpotence: by Remark~\ref{rem:valuation} it is equivalent to $p^{(p^e-1)/(p-1)} = 0$ in $A$, and it holds for $e = N$ when $p^N = 0$. It enters the proofs of the comparison theorems only through Lemma~\ref{lem:pd-exponent}, in Lemma~\ref{lem:truncation-envelope}, so that truncation does not change divided power envelopes. The comparison theorems are proved in Lean on the thickenings of exponent $m$, for every $m > 0$ with $m! = 0$ in $A$, and the fields of \lean{IsCrystallineBase}, namely $p \in I$ and the nilpotence of $p$, are not used in their proofs. The condition $I \cdot C = 0$ means that $\gamma$ extends to $C$ trivially, on the zero ideal, so it is a special case of the usual compatibility condition.
+
+\spa
+
+The base is $\Spec(C)$, the objects are affine thickenings $B \twoheadrightarrow C$, the topology is chaotic, and cohomology is the right derived functor of the limit. Only the structure sheaf $\Ocris$ is treated: no crystal of modules and no de Rham complex with connection appears.
+
+\spa
+
+The theorems of \lean{Ocris/} take an envelope family $E$, used only through \lean{IsDPEnvelope}; those of \lean{MainTheorems.lean} use the family \lean{envelopeFamily} of Theorem~\ref{thm:envelope-existence}, and the cohomology does not depend on $E$. The comparison is stated on $\INF_e$ for some $e$ with $(p^e)! = 0$ in $A$; by Proposition~\ref{prop:cech-envelope}, $D(0)$ is an envelope of $A[x_c : c \in C] \twoheadrightarrow C$ itself, so the right-hand side does not depend on $e$.
+
+\subsection{An explicit description of envelopes}\label{subsec:existence}
+
+The existence proof of Theorem~\ref{thm:envelope-existence} realises the envelope inside a product indexed by all admissible pairs, and gives no explicit description of it. Such a description is not needed for the comparison theorems, but it would be needed to compute: for instance, to show that the envelope of a polynomial presentation in which $J$ is generated by variables is a divided power polynomial algebra.
+
+\spa
+
+The classical description is as a quotient of a divided power algebra, $D \simeq \Gamma_B(J)/J_{12}$ \cite{berthelot-ogus,roby65}; see also \cite{cl-df,cl-df-laws} for the formalisation of divided power algebras in Lean. The folder \lean{Envelope/FreeConstruction/} contains results in this direction. For the divided power algebra $\Gamma_R(M)$, the library proves that the positive ideal $\Gamma^+$ is the kernel of the augmentation, that $\Gamma/\Gamma^+ \simeq R$, and that divided powers on $\Gamma^+$ are determined by their values on the generators $\gamma_k(m)$ (\lean{positiveIdeal_eq_augmentation_ker}, \lean{positiveQuotientEquiv}, \lean{dividedPowers_eq_of_positiveGenerator_agreement}). When $M$ is free with a basis $b$, it proves that the Roby monomials \cite{roby63} span each graded piece and are linearly independent in degrees $0$ and $1$ (\lean{robyGradeMonomial_span_eq_top}, \lean{robyGradeZeroBasis}, \lean{robyGradeMonomial_degree_one_linearIndependent}). Assuming that the Roby monomials form a basis and that Roby's formula satisfies the axioms of divided powers, it constructs divided powers on $\Gamma^+$ and proves that they are unique (\lean{dividedPowers_unique}). Assuming divided powers on $\Gamma^+$ satisfying Roby's formula, it proves the binomial expansion of the divided powers of the second family of relations (\lean{rel2_dpow_expansion}). If moreover $J_{12} \cap \Gamma^+$ is a sub-divided power ideal, the quotient $\Gamma_B(J')/J_{12}$, with $J' \coloneqq J + IB$, inherits divided powers (\lean{IncludedEnvelopeConstructionData.quotientDividedPowers}, \lean{IncludedEnvelopeConstructionData.quotientMap_isDPMorphism}). Finally, if for every target the map out of $\Gamma_B(J')$ given by its universal property is a morphism of divided power algebras vanishing on $J_{12}$, the induced map is the unique compatible one (\lean{QuotientUniversalProperty.compatible_map_eq_quotientMap}).
+
+\spa
+
+The following is not proved: the linear independence of Roby monomials in degrees at least $2$; Roby's theorem that $\Gamma^+$ carries divided powers, whose formalisation through polynomial laws is in progress \cite{cl-df-laws}; the stability of $J_{12} \cap \Gamma^+$ under these divided powers; and the compatibility of the maps out of $\Gamma_B(J')$ with divided powers. Hence the envelope of Theorem~\ref{thm:envelope-existence} is not identified with $\Gamma_B(J')/J_{12}$.
+
+\subsection{Comparison with the crystalline site}
+
+The library computes crystalline cohomology as $R\Gamma(\INF(C/A), \Ocris)$ and does not define Berthelot's crystalline site of $\Spec(C)$ over $\Spec(A)$, whose objects are divided power thickenings $U \hookrightarrow T$ with $U \subseteq \Spec(C)$ open, with a Zariski or étale topology. That its cohomology agrees with $R\Gamma(\INF(C/A), \Ocris)$ is classical and is not formalised. It follows from Theorem~\ref{thm:main} and the classical comparison with $\Omega^\bullet_D$ \cite[Tag~07LG]{stacks}, or from the description of the cohomology of the crystalline site of an affine scheme as a derived limit over affine divided power thickenings \cite[Tag~07JK]{stacks}, combined with the adjunction between envelopes and the functor forgetting divided powers.
+
+\subsection{Globalisation and coefficients}
+
+The result concerns $\Spec(C)$ only, and passing to schemes over $\Spec(A)$ requires gluing the affine comparison along a cover. Replacing $\Ocris$ by a crystal in quasi-coherent modules leads to the de Rham complex of a module with connection; the present proof treats only the trivial crystal.
+
+\spa
+
+A fully general statement would also have to lift two simplifications made at the outset: the condition $I \cdot C = 0$, in place of the condition that $\gamma$ extends to $C$, and the nilpotence of $p$, in place of $p$-adic completions.
+
+\subsection{Possible contributions to Mathlib}
+
+Several results above do not depend on crystalline cohomology and could be contributed to Mathlib: Lemma~\ref{lem:exterior-quotient}; Propositions~\ref{prop:acyclic-assembly}, \ref{prop:augmented} and~\ref{prop:totmap}, after a comparison with Mathlib's total complexes of bicomplexes; Theorem~\ref{thm:bdj}; Theorem~\ref{thm:contraction}; Theorem~\ref{thm:enough-injectives} and Proposition~\ref{prop:precomposition}; Theorems~\ref{thm:derived-left-adjoint} and~\ref{thm:cech-derived}; and the divided power differentials of Section~\ref{sec:pd-derham}.
+
+%======================================================================
+\section*{Acknowledgements}
+%======================================================================
+
+This work was supported by the IdEx University of Strasbourg. It was also supported by the Agence Nationale de la Recherche (ANR, French National Research Agency) through the project ANR-25-CE40-7869-01. We thank Anthropic for access to Claude through the Claude Team plan for scientists.
+
+%======================================================================
+\appendix
+\section{Index of main declarations}\label{app:index}
+%======================================================================
+
+Names are given up to their namespace. Most are in \lean{AffineCrystalline} or one of its sub-namespaces; those defined in \lean{PDDifferentials.lean}, \lean{PDDifferentials/}, \lean{SquareZero.lean}, \lean{DeRham.lean}, \lean{DeRham/RiouFull.lean} and \lean{Envelope/PDKaehlerComparison.lean} are in the root namespace. Paths are relative to \lean{AffineCrystalline/}.
+
+{\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.2\linewidth} >{\raggedright\arraybackslash}p{0.44\linewidth} >{\raggedright\arraybackslash}p{0.3\linewidth}@{}}
+\toprule
+Result & Lean declaration & File \\
+\midrule
+\endhead
+Lemma~\ref{lem:pd-exponent} & \lean{dividedPowers_pow_eq_zero_of_factorial_eq_zero} & \lean{InfinitesimalSite/Envelope.lean} \\
+Cor.~\ref{cor:pd-exponent-nilpotent} & \lean{natCast_factorial_pow_eq_zero} & \lean{InfinitesimalSite/Envelope.lean} \\
+Prop.~\ref{prop:levels} & \lean{frobeniusExponent_le_iff}, \lean{Level.exists_frobenius_level} & \lean{InfinitesimalSite/Filtration.lean} \\
+Prop.~\ref{prop:truncation} & \lean{truncateLift}, \lean{truncate_hom_ext} & \lean{InfinitesimalSite/Filtration.lean} \\
+Thm.~\ref{thm:adjunction} & \lean{Level.truncationAdjunction} & \lean{InfinitesimalSite/Filtration.lean} \\
+Prop.~\ref{prop:coproducts} & \lean{Level.coprodCofanIsColimit} & \lean{InfinitesimalSite/Filtration.lean} \\
+Prop.~\ref{prop:cech-hom} & \lean{Level.cechHomEquiv} & \lean{InfinitesimalSite/Filtration.lean} \\
+Prop.~\ref{prop:envelope-unique} & \lean{IsDPEnvelope.comparisonEquiv} & \lean{Envelope/PDKaehlerComparison.lean} \\
+Thm.~\ref{thm:envelope-existence} & \lean{DPEnvelope.hasDPEnvelope}, \lean{envelopeExistenceData} & \lean{Envelope/Construction.lean}, \lean{MainTheorems.lean} \\
+Prop.~\ref{prop:functoriality} & \lean{EnvelopeChoice.comparison_comp} & \lean{InfinitesimalSite/Envelope.lean} \\
+Thm.~\ref{thm:projection} & \lean{projectionKernel_eq_dividedPowersIdeal} & \lean{InfinitesimalSite/Envelope.lean} \\
+Lemma~\ref{lem:truncation-envelope} & \lean{EnvelopeChoice.truncate_isInitial}, \lean{EnvelopeFamily.ocrisTruncationIso} & \lean{Ocris/Filtration.lean} \\
+Thm.~\ref{thm:adjunction-derived} & \lean{EnvelopeFamily.ocrisDerivedGlobalSectionsIsoLevel} & \lean{Ocris/Filtration.lean} \\
+Prop.~\ref{prop:cech-envelope} & \lean{ocrisCech_isEnvelope} & \lean{Ocris/Filtration.lean} \\
+Prop.~\ref{prop:pd-kaehler} & \lean{pdKaehlerDerivationEquiv} & \lean{PDDifferentials/Representability.lean} \\
+Prop.~\ref{prop:square-zero} & \lean{sqZeroDividedPowers} & \lean{SquareZero.lean} \\
+Thm.~\ref{thm:derivation-extension} & \lean{existsUnique_pdDerivation_of_initial} & \lean{Ocris/PDDerivationExtension.lean} \\
+Thm.~\ref{thm:envelope-differentials} & \lean{pdKaehler_dpEnvelope} & \lean{PDDifferentials.lean} \\
+Lemma~\ref{lem:exterior-quotient} & \lean{exteriorPower_ker_map_mkQ} & \lean{DeRham/ExteriorPowerQuotient.lean} \\
+Thm.~\ref{thm:derham} & \lean{DeRhamComplex.d_d} & \lean{DeRham/RiouFull.lean} \\
+Thm.~\ref{thm:pd-derham} & \lean{pdQuotientRelationStable}, \lean{pdDeRhamComplex} & \lean{DeRham/PDStabilityFull.lean}, \lean{DeRham.lean} \\
+Prop.~\ref{prop:pd-derham-functorial} & \lean{pdDeRhamMap_comp} & \lean{Ocris/DeRham.lean} \\
+Prop.~\ref{prop:acyclic-assembly} & \lean{exactAt_totComplex_of_columnsExact} & \lean{Homology/TotM.lean} \\
+Prop.~\ref{prop:totmap} & \lean{totMap_quasiIso} & \lean{Homology/TotQuasiIso.lean} \\
+Thm.~\ref{thm:bdj} & \lean{RawBi.bhattDeJong_row}, \lean{RawBi.bhattDeJong_column} & \lean{Homology/CosimplicialTot.lean} \\
+Thm.~\ref{thm:contraction} & \lean{CosimplicialContraction.exactAt} & \lean{Homology/CosimplicialContraction.lean} \\
+Thm.~\ref{thm:enough-injectives} & \lean{hasEnoughInjectivesFunctorCategory} & \lean{Cohomology/FunctorCategoryInjectives.lean} \\
+Thm.~\ref{thm:derived-left-adjoint} & \lean{derivedLimitIsoOfAdjunction} & \lean{Ocris/Filtration.lean} \\
+Thm.~\ref{thm:cech-zigzag} & \lean{cechZigzag} & \lean{Cohomology/Cech.lean} \\
+Thm.~\ref{thm:cech-derived} & \lean{rightDerivedLimIsoCech} & \lean{Cohomology/CechDerived.lean} \\
+Thm.~\ref{thm:cech-alexander} & \lean{EnvelopeFamily.crystallineCohomologyIsoCechAlexander} & \lean{Ocris/CechAlexander.lean}, \lean{MainTheorems.lean} \\
+Prop.~\ref{prop:presented} & \lean{PresentedEnvelope.eq_top}, \lean{span_dx} & \lean{Ocris/PresentedEnvelope.lean}, \lean{Ocris/PresentedEnvelopeTools.lean} \\
+Prop.~\ref{prop:vanishing} & \lean{positiveCechExact} & \lean{Ocris/CechVanishing.lean} \\
+Thm.~\ref{thm:one-variable} & \lean{OneVariable.cocycle_succ} & \lean{DeRham/OneVariablePoincare.lean} \\
+Prop.~\ref{prop:poincare} & \lean{firstVertexQuasiIso} & \lean{Ocris/CechPoincare.lean} \\
+Thm.~\ref{thm:main} & \lean{EnvelopeFamily.crystallineCohomologyIsoDeRham} & \lean{Ocris/CechPoincare.lean}, \lean{MainTheorems.lean} \\
+\bottomrule
+\end{longtable}
+}
+
+%======================================================================
+\begin{thebibliography}{99}
+
+\bibitem{stacks}
+The Stacks Project Authors, \emph{The Stacks Project}. \url{https://stacks.math.columbia.edu}
+
+\bibitem{bhatt-dejong}
+B.~Bhatt and A.~J.~de Jong, \emph{Crystalline cohomology and de Rham cohomology}, preprint, 2011, \href{https://arxiv.org/abs/1110.5001}{arXiv:1110.5001}.
+
+\bibitem{berthelot}
+P.~Berthelot, \emph{Cohomologie cristalline des schémas de caractéristique $p > 0$}, Lecture Notes in Mathematics 407, Springer, 1974.
+
+\bibitem{berthelot-ogus}
+P.~Berthelot and A.~Ogus, \emph{Notes on crystalline cohomology}, Mathematical Notes 21, Princeton University Press, 1978.
+
+\bibitem{cl-df}
+A.~Chambert-Loir and M.~I.~de Frutos-Fernández, \emph{A formalization of divided powers in Lean}, in: 16th International Conference on Interactive Theorem Proving (ITP 2025), LIPIcs, 2025, 4:1--4:17, \href{https://doi.org/10.4230/LIPIcs.ITP.2025.4}{doi:10.4230/LIPIcs.ITP.2025.4}.
+
+\bibitem{cl-df-laws}
+A.~Chambert-Loir and M.~I.~de Frutos-Fernández, \emph{Formalizing polynomial laws and the universal divided power algebra}, in: Proceedings of the 15th ACM SIGPLAN International Conference on Certified Programs and Proofs (CPP 2026), ACM, 2026, 75--87, \href{https://doi.org/10.1145/3779031.3779108}{doi:10.1145/3779031.3779108}, \href{https://arxiv.org/abs/2512.05750}{arXiv:2512.05750}.
+
+\bibitem{mathlib}
+The mathlib Community, \emph{The Lean mathematical library}, in: Proceedings of the 9th ACM SIGPLAN International Conference on Certified Programs and Proofs (CPP 2020), 2020, 367--381, \href{https://doi.org/10.1145/3372885.3373824}{doi:10.1145/3372885.3373824}. \url{https://github.com/leanprover-community/mathlib4}
+
+\bibitem{roby63}
+N.~Roby, \emph{Lois polynômes et lois formelles en théorie des modules}, Ann. Sci. École Norm. Sup. (3) \textbf{80} (1963), 213--348.
+
+\bibitem{roby65}
+N.~Roby, \emph{Les algèbres à puissances divisées}, Bull. Sci. Math. (2) \textbf{89} (1965), 75--91.
+
+\bibitem{edged}
+M.~D'Addezio, \emph{Edged crystalline cohomology}, preprint, \url{https://daddezio.pages.math.cnrs.fr/edged-crys.pdf}.
+
+\end{thebibliography}
+
+\end{document}

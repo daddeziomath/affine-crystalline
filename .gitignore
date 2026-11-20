@@ -4,3 +4,12 @@
 # Editor and local experiments
 .vscode/
 Scratch*.lean
+
+# LaTeX build artefacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.synctex.gz
+paper/*.fls
+paper/*.fdb_latexmk
